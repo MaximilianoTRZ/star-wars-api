@@ -25,6 +25,10 @@
         <spotless.version>3.11.0</spotless.version>
         <palantir-java-format.version>2.103.0</palantir-java-format.version>
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.organization>maximilianotrz</sonar.organization>
+        <sonar.projectKey>MaximilianoTRZ_star-wars-api</sonar.projectKey>
     </properties>
 
     <dependencies>
@@ -51,6 +55,15 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

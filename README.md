@@ -1,5 +1,9 @@
 # Star Wars API
 
+[![CI](https://github.com/MaximilianoTRZ/star-wars-api/actions/workflows/ci.yml/badge.svg)](https://github.com/MaximilianoTRZ/star-wars-api/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=coverage)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
+
 API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starships y Vehicles con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. Java 21 + Spring Boot 4.1.
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
@@ -48,6 +52,8 @@ Corre los tests unitarios y de integración, y las verificaciones de calidad.
 - el formato no coincide con palantir-java-format (`./mvnw spotless:apply` lo corrige),
 - la cobertura de líneas baja del 80% (reporte en `target/site/jacoco/index.html`),
 - se rompe una regla de arquitectura de `ArchitectureTest`.
+
+En CI, además, cada push a `main` y cada PR se analizan en [SonarCloud](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api) con el quality gate por defecto. Dependabot abre PRs semanales con las actualizaciones de Maven y de GitHub Actions.
 
 ## Decisiones de diseño
 
