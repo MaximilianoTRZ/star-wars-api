@@ -1,5 +1,6 @@
 package dev.starwars.shared.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -31,10 +33,8 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(status))
                 .andExpect(jsonPath("$.instance").value(instance))
-                .andExpect(jsonPath("$.timestamp").isNotEmpty());
-        if (type != null) {
-            result.andExpect(jsonPath("$.type").value("/problems/" + type));
-        }
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(jsonPath("$.type").value("/problems/" + type));
     }
 
     @Test
@@ -106,7 +106,10 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("a parameter of the wrong type is 400 from Spring MVC, with timestamp and instance")
     void typeMismatch() throws Exception {
-        assertProblem(mvc.perform(get("/test/errors/param").param("size", "abc")), 400, null, "/test/errors/param");
+        var result = mvc.perform(get("/test/errors/param").param("size", "abc"));
+
+        assertProblem(result, 400, "bad-request", "/test/errors/param");
+        result.andExpect(jsonPath("$.detail").value("Parameter 'size' has an invalid value."));
     }
 
     @Test
@@ -117,19 +120,30 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ not json")),
                 400,
-                null,
+                "bad-request",
                 "/test/errors/body");
     }
 
     @Test
     @DisplayName("an unknown route is 404 from Spring MVC")
     void unknownRoute() throws Exception {
-        assertProblem(mvc.perform(get("/test/errors/nope")), 404, null, "/test/errors/nope");
+        var result = mvc.perform(get("/test/errors/nope"));
+
+        assertProblem(result, 404, "not-found", "/test/errors/nope");
+        result.andExpect(jsonPath("$.title").value("Not Found"))
+                .andExpect(jsonPath("$.detail").value("No endpoint matches this path."))
+                .andExpect(content().string(not(containsString("static resource"))));
     }
 
     @Test
     @DisplayName("an unsupported method is 405 from Spring MVC")
     void methodNotAllowed() throws Exception {
-        assertProblem(mvc.perform(post("/test/errors/not-found")), 405, null, "/test/errors/not-found");
+        assertProblem(mvc.perform(post("/test/errors/not-found")), 405, "method-not-allowed", "/test/errors/not-found");
+    }
+
+    @Test
+    @DisplayName("an unknown status maps to an http-<code> type")
+    void typeForUnknownStatus() {
+        assertThat(GlobalExceptionHandler.typeFor(HttpStatusCode.valueOf(499))).isEqualTo("http-499");
     }
 }

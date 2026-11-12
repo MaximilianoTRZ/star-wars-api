@@ -6,8 +6,11 @@ import dev.starwars.swapi.UpstreamUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -21,6 +24,7 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Single place where exceptions are translated to HTTP. Every response is a {@link ProblemDetail}.
@@ -32,6 +36,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private static final URI ABOUT_BLANK = URI.create("about:blank");
 
     private final ProblemDetailFactory problems;
 
@@ -109,7 +115,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, validationProblem(errors), headers, status, request);
     }
 
-    /** Every response built by the base class goes through here to get a timestamp and an instance. */
+    /**
+     * Every response built by the base class goes through here. Spring MVC errors get the same shape as the
+     * rest: an explicit {@code type} derived from the status, a {@code timestamp}, an {@code instance} and a
+     * {@code detail} that does not reveal framework internals.
+     */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
             Exception ex, Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
@@ -119,12 +129,35 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             body = errorResponse.getBody();
         }
         if (body instanceof ProblemDetail problem) {
+            if (problem.getType() == null || ABOUT_BLANK.equals(problem.getType())) {
+                problem.setType(URI.create("/problems/" + typeFor(statusCode)));
+            }
+            publicDetail(ex).ifPresent(problem::setDetail);
             problems.withTimestamp(problem);
             if (problem.getInstance() == null && request instanceof ServletWebRequest servlet) {
                 problem.setInstance(URI.create(servlet.getRequest().getRequestURI()));
             }
         }
         return super.handleExceptionInternal(ex, body, headers, statusCode, request);
+    }
+
+    /** {@code 404} → {@code not-found}, {@code 405} → {@code method-not-allowed}. */
+    static String typeFor(HttpStatusCode status) {
+        HttpStatus known = HttpStatus.resolve(status.value());
+        return known == null
+                ? "http-" + status.value()
+                : known.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** Replaces Spring messages that mention internals (static resources, type conversion). */
+    private static Optional<String> publicDetail(Exception ex) {
+        if (ex instanceof NoResourceFoundException) {
+            return Optional.of("No endpoint matches this path.");
+        }
+        if (ex instanceof TypeMismatchException mismatch && mismatch.getPropertyName() != null) {
+            return Optional.of("Parameter '" + mismatch.getPropertyName() + "' has an invalid value.");
+        }
+        return Optional.empty();
     }
 
     private ProblemDetail validationProblem(List<FieldViolation> errors) {
