@@ -18,7 +18,7 @@ class ProdProfileTest {
     }
 
     @Test
-    @DisplayName("prod does not start without JWT_SECRET and DEMO_USER_PASSWORD")
+    @DisplayName("prod does not start without its secrets")
     void failsWithoutSecrets() {
         assumeTrue(System.getenv("JWT_SECRET") == null && System.getenv("DEMO_USER_PASSWORD") == null);
 
@@ -29,7 +29,10 @@ class ProdProfileTest {
     @DisplayName("prod starts when the secrets are set")
     void startsWithSecrets() {
         try (ConfigurableApplicationContext context = prodApp()
-                .run("--JWT_SECRET=prod-secret-0123456789-0123456789-0123", "--DEMO_USER_PASSWORD=prod-password")) {
+                .run(
+                        "--JWT_SECRET=prod-secret-0123456789-0123456789-0123",
+                        "--DEMO_USER_PASSWORD=prod-password",
+                        "--METRICS_PASSWORD=prod-metrics-password-123")) {
             assertThat(context.isRunning()).isTrue();
         }
     }

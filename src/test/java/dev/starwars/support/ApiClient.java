@@ -38,6 +38,15 @@ public final class ApiClient {
                 .toEntity(String.class);
     }
 
+    public ResponseEntity<String> getWithBasicAuth(String uri, String username, String password) {
+        return restClient
+                .get()
+                .uri(uri)
+                .headers(headers -> headers.setBasicAuth(username, password))
+                .retrieve()
+                .toEntity(String.class);
+    }
+
     public ResponseEntity<String> get(String uri, String token) {
         return restClient
                 .get()
