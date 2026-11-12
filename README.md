@@ -46,6 +46,40 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 6 | Tests unitarios y de integración | 245 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
 | 7 | Despliegue | Docker multi-stage en Render, con deploy automático desde `main` |
 
+## Features
+
+### MVP: lo que pide el challenge (Fase 1, `v1.0.0`)
+
+Para una revisión acotada alcanza con esta parte: cubre los 7 requisitos de la tabla de arriba.
+
+- **Catálogo de SWAPI:** People, Films, Starships y Vehicles, con listado (`GET /api/v1/{recurso}`) y detalle (`GET /api/v1/{recurso}/{id}`).
+- **Paginación uniforme:** `page` y `size` (1 a 100) iguales para los 4 recursos, aunque SWAPI no pagine films ni búsquedas. Una página fuera de rango vuelve vacía, con los totales reales.
+- **Filtros por ID y/o nombre** (por título en films): búsqueda "contiene" sin distinguir mayúsculas, y combinación de los dos filtros.
+- **Login seguro:** `POST /api/v1/auth/login` con usuarios en H2 y contraseñas en BCrypt; emite un JWT HS256 que dura 1 hora.
+- **Autenticación y autorización:** el catálogo exige el JWT con el scope `catalog:read`; cualquier otra ruta se rechaza (deny by default).
+- **Errores uniformes** con Problem Details (RFC 9457), incluidos 401 y 403.
+- **Documentación:** README, Swagger UI / OpenAPI, Javadoc, RFC y ADRs.
+- **Tests unitarios y de integración**, con SWAPI simulada con WireMock sobre respuestas reales.
+- **Despliegue** en Render con Docker; colección de Postman y archivo `.http` para probarla.
+
+### Sumado después, por decisión propia (Fases 0 y 2 a 6)
+
+- **Calidad desde el primer commit (Fase 0):** CI en GitHub Actions, quality gate de SonarCloud, cobertura mínima de 80% con JaCoCo, reglas de arquitectura con ArchUnit, formato con Spotless y Dependabot.
+- **Resiliencia (Fase 2):** caché de SWAPI con Caffeine (1 hora), retry con backoff que respeta el `Retry-After` de SWAPI y circuit breaker que responde 503 al instante cuando SWAPI está caída.
+- **Observabilidad (Fase 3):**
+  - Métricas técnicas y de negocio con Micrometer y Prometheus.
+  - Correlation ID (`X-Request-Id`) en logs, headers y errores.
+  - Prometheus, Grafana y alertas como código, con `docker compose up`.
+  - Dashboard público en Grafana Cloud con datos de Render, incluida una fila con el estado de las alertas.
+- **Seguridad y operación (Fase 4):**
+  - Rate limiting del login: 5 intentos por minuto por IP, tomando la IP real de Cloudflare.
+  - Logs de producción en JSON (ECS).
+  - Fail fast si faltan secretos en `prod`.
+  - Notas de escalabilidad.
+- **GraphQL (Fase 5):** `/graphql` sobre el mismo servicio y con el mismo JWT; GraphiQL público con la query y el token precargados; errores con el mismo `type` que REST; límite de 5 campos raíz por query.
+- **MCP (Fase 6):** servidor MCP stateless en `/mcp` con 8 tools de solo lectura, para consultar el catálogo desde Claude Code, Claude Desktop o Cursor con el mismo JWT.
+- **Demo fácil de probar:** Swagger UI con las credenciales demo precargadas y autorizado al hacer login, comandos de una línea para Render y Postman con el token automático.
+
 ## Cómo se construyó
 
 **El MVP ([Fase 1, `v1.0.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.0.0)) cumple todos los requisitos del challenge** (la tabla de arriba). A partir de ahí, el alcance se amplió por fases con prácticas que consideré necesarias para que una API así funcione bien en producción: tolerar un proveedor lento y con rate limit, ver qué pasa adentro y endurecer la seguridad, sin cambiar el contrato REST. Cada fase terminó con un release taggeado y desplegado en Render.
