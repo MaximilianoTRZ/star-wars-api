@@ -40,7 +40,7 @@ import org.springframework.security.web.SecurityFilterChain;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties(MetricsScrapeProperties.class)
+@EnableConfigurationProperties({MetricsScrapeProperties.class, LoginRateLimitProperties.class})
 public class SecurityConfig {
 
     /** Scope issued by login and required by the catalog endpoints. */

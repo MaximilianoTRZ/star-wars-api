@@ -40,6 +40,9 @@ app:
       secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789}
       issuer: star-wars-api
       ttl: 1h
+    login-rate-limit:
+      capacity: 5
+      period: 1m
     demo-user:
       username: demo
       # Local development default only. The prod profile requires DEMO_USER_PASSWORD.
