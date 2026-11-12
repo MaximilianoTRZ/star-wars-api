@@ -75,6 +75,13 @@ logging:
   pattern:
     # Prefixes every log line written during a request with its correlation ID.
     correlation: "[%X{requestId:-}] "
+  # Levels policy in ADR-018. Override in Render with e.g. LOGGING_LEVEL_DEV_STARWARS=DEBUG (needs a restart).
+  level:
+    root: INFO
+    dev.starwars: INFO
+    # Startup and connection pool chatter: only warnings and errors
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN
 
 springdoc:
   swagger-ui:
