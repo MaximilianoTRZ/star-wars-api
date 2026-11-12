@@ -39,12 +39,18 @@ public final class ApiClient {
                 .toEntity(String.class);
     }
 
-    public ResponseEntity<String> postWithToken(String uri, String json, String token) {
+    /** Posts a JSON-RPC message to {@code /mcp}; {@code token} may be {@code null}. */
+    public ResponseEntity<String> mcp(String json, String token) {
         return restClient
                 .post()
-                .uri(uri)
+                .uri("/mcp")
                 .contentType(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .header(HttpHeaders.ACCEPT, "application/json, text/event-stream")
+                .headers(headers -> {
+                    if (token != null) {
+                        headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                    }
+                })
                 .body(json)
                 .retrieve()
                 .toEntity(String.class);

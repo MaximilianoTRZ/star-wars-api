@@ -1,4 +1,4 @@
-package dev.starwars.catalog.graphql;
+package dev.starwars.catalog.web;
 
 import dev.starwars.catalog.domain.CatalogChannel;
 import jakarta.servlet.FilterChain;
@@ -6,28 +6,31 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Optional;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Marks requests to {@code /graphql} with the {@link CatalogChannel#GRAPHQL} channel in the MDC. */
+/**
+ * Puts the {@link CatalogChannel} of the request in the MDC: {@code /graphql} is GraphQL and {@code /mcp} is MCP.
+ * Other requests carry no channel and count as REST.
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 3)
-public class GraphQlChannelFilter extends OncePerRequestFilter {
-
-    static final String PATH = "/graphql";
+public class CatalogChannelFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !PATH.equals(request.getRequestURI());
+        return CatalogChannel.forPath(request.getRequestURI()).isEmpty();
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        MDC.put(CatalogChannel.MDC_KEY, CatalogChannel.GRAPHQL.label());
+        Optional<CatalogChannel> channel = CatalogChannel.forPath(request.getRequestURI());
+        channel.ifPresent(c -> MDC.put(CatalogChannel.MDC_KEY, c.label()));
         try {
             chain.doFilter(request, response);
         } finally {

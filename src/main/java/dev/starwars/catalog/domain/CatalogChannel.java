@@ -1,6 +1,8 @@
 package dev.starwars.catalog.domain;
 
+import java.util.Arrays;
 import java.util.Locale;
+import java.util.Optional;
 import org.slf4j.MDC;
 
 /**
@@ -9,11 +11,25 @@ import org.slf4j.MDC;
  * to the logs. A bounded set, so it is safe as a metric tag.
  */
 public enum CatalogChannel {
-    REST,
-    GRAPHQL;
+    REST(null),
+    GRAPHQL("/graphql"),
+    MCP("/mcp");
 
     /** MDC key holding the channel of the current request. */
     public static final String MDC_KEY = "channel";
+
+    private final String path;
+
+    CatalogChannel(String path) {
+        this.path = path;
+    }
+
+    /** Channel served on {@code path}, if any adapter other than REST owns it. */
+    public static Optional<CatalogChannel> forPath(String path) {
+        return Arrays.stream(values())
+                .filter(channel -> channel.path != null && channel.path.equals(path))
+                .findFirst();
+    }
 
     /** Channel of the current request; REST when no adapter set one. */
     public static CatalogChannel current() {
