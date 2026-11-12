@@ -21,8 +21,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * answers 429 with {@code Retry-After} before the request reaches security or the controller.
  *
  * <p>Registered by {@link SecurityConfig}. Runs right after the correlation ID and request logging filters, so the 429 carries a {@code requestId} and gets an access line. The IP comes from
- * {@link HttpServletRequest#getRemoteAddr()}; in {@code prod} Spring resolves it from {@code X-Forwarded-For}
- * because the app runs behind Render's proxy ({@code server.forward-headers-strategy=framework}).
+ * {@link HttpServletRequest#getRemoteAddr()}. In {@code prod} Tomcat resolves it from {@code X-Forwarded-For}
+ * ({@code server.forward-headers-strategy=native}), taking the address appended by Render's proxy instead of the
+ * leftmost one, which the client can set to anything.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE + 2)
 class LoginRateLimitFilter extends OncePerRequestFilter {
