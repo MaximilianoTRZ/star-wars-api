@@ -34,6 +34,22 @@ API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starshi
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
 
+## Índice
+
+**Revisión rápida del challenge:** [Qué es](#qué-es) → [MVP](#mvp-lo-que-pide-el-challenge-fase-1-v100) → [Probarlo en Render](#probarlo-en-render).
+
+1. [Qué es](#qué-es): los 7 requisitos y cómo se cumplen
+2. [Features](#features): [MVP del challenge](#mvp-lo-que-pide-el-challenge-fase-1-v100) y [lo sumado después](#sumado-después-por-decisión-propia-fases-0-y-2-a-6)
+3. [Cómo se construyó](#cómo-se-construyó): qué agregó cada fase y su release
+4. [Demo](#demo): URLs, usuario demo y [cómo probarlo en Render](#probarlo-en-render) (GraphiQL precargado, Swagger, Claude Code, Postman)
+5. [Quick start](#quick-start) y [Configuración](#configuración): levantarlo en local
+6. [Uso](#uso): REST con curl, [Endpoints](#endpoints) y [Errores](#errores)
+7. [GraphQL](#graphql) y [MCP](#mcp): los otros dos canales sobre el mismo catálogo
+8. [Resiliencia y caché](#resiliencia-y-caché): caché, retry, circuit breaker y [prueba de carga](#prueba-de-carga)
+9. [Observabilidad](#observabilidad): [dashboard en vivo](#dashboard-en-vivo), [alertas](#alertas), [métricas de negocio](#métricas-de-negocio) y [logs](#logs-y-correlación)
+10. [Seguridad](#seguridad), [Arquitectura](#arquitectura), [Tests](#tests) y [Calidad](#calidad)
+11. [Decisiones de diseño](#decisiones-de-diseño) (ADRs), [¿Por qué no microservicios?](#por-qué-no-microservicios) y [Cómo lo escalaría](#cómo-lo-escalaría)
+
 ## Qué es
 
 | # | Requisito | Cómo se cumple |
