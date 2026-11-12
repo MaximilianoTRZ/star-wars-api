@@ -555,10 +555,10 @@ Decorator `ResilientSwapiClient` entre el caché y el cliente HTTP: `CachingSwap
 
 ### Salida de la fase
 
-- [ ] Requests repetidos no llegan a SWAPI
-- [ ] SWAPI caída produce 503 rápido, no timeouts encadenados
-- [ ] Un 429 de SWAPI se reintenta o se propaga con `Retry-After`
-- [ ] Tag `v1.1.0`
+- [x] Requests repetidos no llegan a SWAPI
+- [x] SWAPI caída produce 503 rápido, no timeouts encadenados
+- [x] Un 429 de SWAPI se reintenta o se propaga con `Retry-After`
+- [x] Tag `v1.1.0`
 
 ## 7. Fase 3 — Observabilidad (~3 h, tag `v1.2.0`)
 
