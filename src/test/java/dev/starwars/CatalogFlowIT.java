@@ -183,6 +183,9 @@ class CatalogFlowIT {
         ResponseEntity<String> missing = api.get(base + "/9999", token);
         assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(JsonPath.<String>read(missing.getBody(), "$.type")).isEqualTo("/problems/resource-not-found");
+        assertThat(JsonPath.<String>read(missing.getBody(), "$.requestId"))
+                .isNotBlank()
+                .isEqualTo(missing.getHeaders().getFirst("X-Request-Id"));
 
         ResponseEntity<String> unknownInList = api.get(base + "?id=9999", token);
         assertThat(unknownInList.getStatusCode()).isEqualTo(HttpStatus.OK);

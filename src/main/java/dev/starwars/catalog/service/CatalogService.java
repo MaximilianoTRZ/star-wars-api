@@ -39,13 +39,26 @@ import org.springframework.stereotype.Service;
 public class CatalogService {
 
     private final SwapiClient swapiClient;
+    private final CatalogMetrics metrics;
 
-    public CatalogService(SwapiClient swapiClient) {
+    public CatalogService(SwapiClient swapiClient, CatalogMetrics metrics) {
         this.swapiClient = swapiClient;
+        this.metrics = metrics;
     }
 
     /** Lists a resource applying the requested filters and pagination. */
     public PageResponse<CatalogItem> find(
+            CatalogResource resource, SearchCriteria criteria, PageRequestParams pageRequest) {
+        metrics.queryExecuted(resource, criteria);
+        metrics.pageRequested(resource, pageRequest.page());
+        PageResponse<CatalogItem> result = resolve(resource, criteria, pageRequest);
+        if (criteria.hasName() && result.totalElements() == 0) {
+            metrics.emptySearch(resource);
+        }
+        return result;
+    }
+
+    private PageResponse<CatalogItem> resolve(
             CatalogResource resource, SearchCriteria criteria, PageRequestParams pageRequest) {
         ResourceType type = toSwapi(resource);
         if (criteria.hasId()) {
@@ -79,10 +92,12 @@ public class CatalogService {
      */
     public CatalogItem getById(CatalogResource resource, String id) {
         ResourceType type = toSwapi(resource);
-        return swapiClient
+        CatalogItem item = swapiClient
                 .findById(type, id)
                 .map(entity -> toItem(type, entity))
                 .orElseThrow(() -> new ResourceNotFoundException(resource, id));
+        metrics.entityViewed(resource, item.name());
+        return item;
     }
 
     private PageResponse<CatalogItem> delegatedPage(ResourceType type, PageRequestParams pageRequest) {

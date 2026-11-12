@@ -10,3 +10,7 @@ app:
       secret: test-secret-0123456789-0123456789-0123456789
     demo-user:
       password: test-password
+
+management:
+  server:
+    port: 0

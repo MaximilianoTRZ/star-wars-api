@@ -1,8 +1,25 @@
 # Production profile: no defaults for secrets.
-# The app fails to start if JWT_SECRET or DEMO_USER_PASSWORD is missing.
+# The app fails to start if JWT_SECRET, DEMO_USER_PASSWORD or METRICS_PASSWORD is missing.
 app:
   security:
     jwt:
       secret: ${JWT_SECRET}
     demo-user:
       password: ${DEMO_USER_PASSWORD}
+  # Grafana Cloud scrapes /actuator/prometheus with these credentials (ADR-015).
+  metrics:
+    scrape:
+      username: ${METRICS_USERNAME:grafana}
+      password: ${METRICS_PASSWORD}
+
+# Render publishes a single port, so Actuator shares it with the API. Only /actuator/prometheus
+# requires credentials; /livez, /readyz, health and info stay public.
+management:
+  server:
+    port: ${server.port:8080}
+
+# JSON logs (Elastic Common Schema); the MDC requestId is included as a field.
+logging:
+  structured:
+    format:
+      console: ecs

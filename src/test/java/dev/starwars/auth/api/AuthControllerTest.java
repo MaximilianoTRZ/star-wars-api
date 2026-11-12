@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
 import dev.starwars.support.WebSliceTestConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,9 @@ class AuthControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private MeterRegistry registry;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -64,6 +68,26 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("records login attempts by result")
+    void recordsAttempts() {
+        double successes = attempts("success");
+        double failures = attempts("failure");
+
+        login("{\"username\":\"demo\",\"password\":\"demo123\"}");
+        login("{\"username\":\"demo\",\"password\":\"wrong\"}");
+
+        assertThat(attempts("success")).isEqualTo(successes + 1);
+        assertThat(attempts("failure")).isEqualTo(failures + 1);
+    }
+
+    private double attempts(String result) {
+        return registry.get("auth.login.attempts")
+                .tag("result", result)
+                .counter()
+                .count();
+    }
+
+    @Test
     @DisplayName("wrong password: 401 ProblemDetail")
     void wrongPassword() {
         MvcTestResult result = login("{\"username\":\"demo\",\"password\":\"wrong\"}");
@@ -87,7 +111,7 @@ class AuthControllerTest {
     private static String withoutVolatileFields(MvcTestResult result) throws Exception {
         return result.getResponse()
                 .getContentAsString(StandardCharsets.UTF_8)
-                .replaceAll("\"timestamp\":\"[^\"]+\"", "");
+                .replaceAll("\"(timestamp|requestId)\":\"[^\"]+\"", "");
     }
 
     @Test

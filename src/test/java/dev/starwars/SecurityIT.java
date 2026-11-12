@@ -64,6 +64,16 @@ class SecurityIT {
     }
 
     @Test
+    @DisplayName("a 401 from the security filters carries the correlation ID in header and body")
+    void correlationIdOnSecurityError() {
+        ResponseEntity<String> response = api.get("/api/v1/people", null);
+
+        String requestId = response.getHeaders().getFirst("X-Request-Id");
+        assertThat(requestId).isNotBlank();
+        assertThat(JsonPath.<String>read(response.getBody(), "$.requestId")).isEqualTo(requestId);
+    }
+
+    @Test
     @DisplayName("a token without the catalog:read scope returns 403")
     void tokenWithoutScope() {
         String token = TestTokens.sign(TEST_SECRET, "star-wars-api", Instant.now(), Duration.ofMinutes(5), null);
@@ -72,10 +82,10 @@ class SecurityIT {
     }
 
     @Test
-    @DisplayName("health, info and OpenAPI docs are public")
+    @DisplayName("probes and OpenAPI docs are public")
     void publicRoutes() {
-        assertThat(api.get("/actuator/health", null).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(api.get("/actuator/info", null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(api.get("/livez", null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(api.get("/readyz", null).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(api.get("/v3/api-docs", null).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(api.get("/swagger-ui/index.html", null).getStatusCode()).isEqualTo(HttpStatus.OK);
     }

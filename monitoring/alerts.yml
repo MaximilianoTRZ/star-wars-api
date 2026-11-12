@@ -1,0 +1,29 @@
+groups:
+  - name: star-wars-api
+    rules:
+      - alert: SwapiCircuitOpen
+        expr: max(resilience4j_circuitbreaker_state{name="swapi", state="open"}) == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: SWAPI circuit breaker open for more than 1 minute
+          description: Catalog requests not served from cache are answered with 503 until SWAPI recovers.
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 5% of API responses are 5xx
+
+      - alert: FailedLoginSpike
+        expr: sum(increase(auth_login_attempts_total{result="failure"}[5m])) > 20
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 20 failed logins in 5 minutes
+          description: Possible brute-force attempt against the login endpoint.
