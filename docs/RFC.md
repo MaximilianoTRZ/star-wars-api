@@ -820,7 +820,7 @@ Cada decisión tiene su archivo en [`docs/adr/`](adr/).
 | SWAPI lenta o caída durante la revisión | El reviewer ve errores | Caché (F2), circuit breaker con 503 claro, aviso en el README |
 | Rate limit de SWAPI (100 requests por IP, IP compartida en Render) | 429 bajo uso intensivo | Caché; retry si el `Retry-After` es corto; si no, 503 con el `Retry-After` de SWAPI |
 | Cold start de Render | El primer request tarda o da timeout | Aviso en el README; desde la Fase 3 el scrape de Grafana Cloud mantiene la instancia despierta |
-| Incompatibilidad de una librería con Boot 4 | Bloquea una fase | Versiones verificadas (springdoc 3.1.0, resilience4j-spring-boot4 2.4.0, wiremock-standalone 3.13.2); Spring AI se confirma en Initializr antes de la WU 5.2 |
+| Incompatibilidad de una librería con Boot 4 | Bloquea una fase | Versiones verificadas (springdoc 3.1.1, resilience4j-spring-boot4 2.4.0, wiremock-standalone 3.13.2); Spring AI se confirma en Initializr antes de la WU 5.2 |
 | Arranque más lento en el free tier al sumar GraphQL y MCP | Health check de Render vencido | Medición después de cada WU de la Fase 5; ajustar el timeout del health check si hace falta |
 | Tiempo | Fases incompletas | Cada fase cierra entregable y taggeada; se corta por fase, nunca por calidad |
 
