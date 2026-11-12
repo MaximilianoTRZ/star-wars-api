@@ -18,11 +18,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Applies {@link LoginRateLimiter} to {@code POST /api/v1/auth/login}, keyed by client IP. Over the limit it
  * answers 429 with {@code Retry-After} before the request reaches security or the controller.
  *
- * <p>Registered by {@link SecurityConfig}. Runs right after the correlation ID filter, so the 429 carries a {@code requestId}. The IP comes from
+ * <p>Registered by {@link SecurityConfig}. Runs right after the correlation ID and request logging filters, so the 429 carries a {@code requestId} and gets an access line. The IP comes from
  * {@link HttpServletRequest#getRemoteAddr()}; in {@code prod} Spring resolves it from {@code X-Forwarded-For}
  * because the app runs behind Render's proxy ({@code server.forward-headers-strategy=framework}).
  */
-@Order(Ordered.HIGHEST_PRECEDENCE + 1)
+@Order(Ordered.HIGHEST_PRECEDENCE + 2)
 class LoginRateLimitFilter extends OncePerRequestFilter {
 
     static final String LOGIN_PATH = "/api/v1/auth/login";
