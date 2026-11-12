@@ -34,6 +34,22 @@ API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starshi
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
 
+## Índice
+
+**Revisión rápida del challenge:** [Qué es](#qué-es) → [MVP](#mvp-lo-que-pide-el-challenge-fase-1-v100) → [Probarlo en Render](#probarlo-en-render).
+
+1. [Qué es](#qué-es): los 7 requisitos y cómo se cumplen
+2. [Features](#features): [MVP del challenge](#mvp-lo-que-pide-el-challenge-fase-1-v100) y [lo sumado después](#sumado-después-por-decisión-propia-fases-0-y-2-a-6)
+3. [Cómo se construyó](#cómo-se-construyó): qué agregó cada fase y su release
+4. [Demo](#demo): URLs, usuario demo y [cómo probarlo en Render](#probarlo-en-render) (GraphiQL precargado, Swagger, Claude Code, Postman)
+5. [Quick start](#quick-start) y [Configuración](#configuración): levantarlo en local
+6. [Uso](#uso): REST con curl, [Endpoints](#endpoints) y [Errores](#errores)
+7. [GraphQL](#graphql) y [MCP](#mcp): los otros dos canales sobre el mismo catálogo
+8. [Resiliencia y caché](#resiliencia-y-caché): caché, retry, circuit breaker y [prueba de carga](#prueba-de-carga)
+9. [Observabilidad](#observabilidad): [dashboard en vivo](#dashboard-en-vivo), [alertas](#alertas), [métricas de negocio](#métricas-de-negocio) y [logs](#logs-y-correlación)
+10. [Seguridad](#seguridad), [Arquitectura](#arquitectura), [Tests](#tests) y [Calidad](#calidad)
+11. [Decisiones de diseño](#decisiones-de-diseño) (ADRs), [¿Por qué no microservicios?](#por-qué-no-microservicios) y [Cómo lo escalaría](#cómo-lo-escalaría)
+
 ## Qué es
 
 | # | Requisito | Cómo se cumple |
@@ -92,7 +108,7 @@ Para una revisión acotada alcanza con esta parte: cubre los 7 requisitos de la 
 | 3 | [`v1.2.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.2.0) | Métricas técnicas y de negocio, correlation ID, Prometheus y Grafana como código, dashboard público | Saber qué pasa en producción sin entrar al servidor | [Observabilidad](#observabilidad) |
 | 4 | [`v1.3.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.3.0) | Rate limiting del login, logging de producción, notas de escalabilidad | Frenar fuerza bruta y diagnosticar desde los logs de Render | [Seguridad](#seguridad), [Logs](#logs-y-correlación), [Escalabilidad](#cómo-lo-escalaría) |
 | 5 | [`v1.4.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.4.0) | GraphQL y GraphiQL sobre el mismo `CatalogService`, con la fila de alertas en el dashboard | Consultas con la forma que pide el cliente, sin duplicar lógica | [GraphQL](#graphql) |
-| 6 | `v1.5.0` (en curso) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [MCP](#mcp) |
+| 6 | [`v1.5.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.5.0) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [MCP](#mcp) |
 
 El detalle de cada fase (work units, tests, decisiones SOLID y criterios de salida) está en el [RFC](docs/RFC.md); las decisiones de diseño, en los [ADRs](#decisiones-de-diseño).
 
@@ -124,7 +140,7 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST, GraphQL y MCP) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
-Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 170 s en arrancar (medido en el deploy de la Fase 5), así que si la instancia está dormida el primer request puede tardar unos 3 minutos. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
+Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 195 s en arrancar (medido en el deploy de la Fase 6), así que si la instancia está dormida el primer request puede tardar unos 3 minutos y medio. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
 ## Quick start
 
@@ -385,10 +401,15 @@ Todas son de solo lectura (`readOnlyHint`). Un ID inexistente devuelve un mensaj
 BASE=https://star-wars-api-ailb.onrender.com   # o http://localhost:8080 (usuario demo / demo123)
 TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/json' \
   -d '{"username":"demo","password":"6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq"}' | jq -r .accessToken)
+claude mcp remove star-wars 2>/dev/null   # por si ya estaba registrado con un token viejo
 claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"
+claude mcp list                            # star-wars tiene que figurar como conectado
 ```
 
-Después, en Claude Code, se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+- En Render, abrir antes https://star-wars-api-ailb.onrender.com/livez: si la instancia estaba dormida, tarda unos 3 minutos y medio en arrancar.
+- Si `TOKEN` queda vacío, el login falló: la instancia todavía está arrancando o se pasó el límite de 5 logins por minuto. Esperar un minuto y repetir.
+
+Después, en Claude Code (`claude`), se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools, y cada llamada a una tool aparece en la conversación.
 
 **Preguntas de ejemplo y las tools que usa el modelo para responderlas.** Las búsquedas devuelven solo `id` y nombre, así que para cualquier atributo el modelo encadena una búsqueda con un `get_*`:
 

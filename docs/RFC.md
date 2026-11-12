@@ -868,11 +868,11 @@ Objetivo: que clientes de IA (Claude, Cursor) consulten el catálogo a través d
 
 ### Salida de la fase
 
-- [ ] `/mcp` funcionando en la URL de Render, protegido con JWT
-- [ ] Tests del adaptador MCP en verde
-- [ ] Probado desde Claude Code contra Render
-- [ ] Arranque revisado en Render
-- [ ] Tag `v1.5.0`
+- [x] `/mcp` funcionando en la URL de Render, protegido con JWT
+- [x] Tests del adaptador MCP en verde
+- [x] Probado desde Claude Code contra Render: `claude mcp add` con el token del login y `claude mcp list` lo muestra conectado
+- [x] Arranque revisado en Render: 195 s con 0,1 CPU (167 s antes de Spring AI); el servicio queda live unos 3,5 minutos después de empezar el deploy
+- [x] Tag `v1.5.0`
 
 ## 11. Decisiones, riesgos y fuentes
 
