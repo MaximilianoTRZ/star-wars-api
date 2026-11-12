@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +30,9 @@ class SecurityConfigTest {
 
     @Autowired
     private MockMvcTester mvc;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
 
     @RestController
     static class ProtectedController {
