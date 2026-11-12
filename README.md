@@ -40,6 +40,8 @@ En local no hace falta configurar nada: el perfil por defecto trae valores de de
 docker compose up --build
 ```
 
+Levanta la app en http://localhost:8080, Prometheus y Grafana (ver [Observabilidad](#observabilidad)).
+
 ### Con Docker
 
 ```bash
@@ -62,6 +64,9 @@ Después abrir http://localhost:8080/swagger-ui.html y hacer login con `demo` / 
 | `JWT_SECRET` | Clave HMAC-SHA256 para firmar los tokens, mínimo 32 bytes | Valor de desarrollo | Obligatoria |
 | `DEMO_USER_PASSWORD` | Contraseña del usuario `demo` | `demo123` | Obligatoria |
 | `SPRING_PROFILES_ACTIVE` | Perfil activo | — | `prod` |
+| `METRICS_USERNAME` | Usuario del scrape de `/actuator/prometheus` | — | `grafana` por defecto |
+| `METRICS_PASSWORD` | Contraseña del scrape, mínimo 16 caracteres | — (en local el endpoint no pide credenciales) | Obligatoria |
+| `GRAFANA_ADMIN_PASSWORD` | Admin de Grafana en el compose local | `admin` | — |
 
 - En el perfil `prod`, si falta una variable o el secreto es corto, la app no arranca (fail fast).
 - Para generar un secreto: `openssl rand -base64 48`.
@@ -127,7 +132,7 @@ curl -s "$BASE/api/v1/starships/9" -H "Authorization: Bearer $TOKEN"
 
 El mismo flujo está disponible como:
 
-- **Colección de Postman** en [`docs/postman/`](docs/postman/): 37 requests con 126 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
+- **Colección de Postman** en [`docs/postman/`](docs/postman/): 40 requests con 131 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
   ```bash
   npx newman run docs/postman/star-wars-api.postman_collection.json \
     -e docs/postman/local.postman_environment.json --delay-request 500
@@ -162,9 +167,12 @@ Todos los errores siguen el formato `ProblemDetail` ([RFC 9457](https://www.rfc-
   "status": 404,
   "detail": "No people found with id 9999",
   "instance": "/api/v1/people/9999",
-  "timestamp": "2026-11-12T06:45:56Z"
+  "timestamp": "2026-11-12T06:45:56Z",
+  "requestId": "3f1c2a9e-7b4d-4e8a-9c1f-2d6b5e8a0f13"
 }
 ```
+
+`requestId` es el mismo valor del header `X-Request-Id` de la respuesta y de las líneas de log del request (ver [Logs y correlación](#logs-y-correlación)).
 
 El campo `type` identifica el problema. Los de la API son:
 
@@ -209,14 +217,88 @@ SWAPI es gratuita, desde Render tarda entre 2 y 9 s y limita a 100 requests por 
 
 **Si SWAPI se cae:** lo que ya está en caché se sigue sirviendo. El resto responde 503 `upstream-unavailable`: primero tras los reintentos y, cuando el circuito se abre, al instante y con `Retry-After: 30`, sin llamar a SWAPI.
 
+## Observabilidad
+
+Métricas con Micrometer y Prometheus, dashboard de Grafana y logs con correlation ID. En local, `docker compose` levanta Prometheus y Grafana. En producción, Grafana Cloud lee las métricas de Render y publica el mismo dashboard ([ADR-015](docs/adr/ADR-015.md)).
+
+### Levantar el stack
+
+```bash
+docker compose up --build
+```
+
+| Servicio | URL | Acceso |
+|---|---|---|
+| API | http://localhost:8080 | — |
+| Grafana | http://localhost:3000 | Anónimo como `Viewer`; admin `admin` / `GRAFANA_ADMIN_PASSWORD` (default `admin`) |
+| Prometheus | http://localhost:9090 | Alertas en http://localhost:9090/alerts |
+
+El dashboard **Star Wars API** queda como home de Grafana, sin pasos manuales: datasource, dashboard y alertas están provisionados desde `monitoring/`. Para ver datos, hacer algunos requests a la API.
+
+### Endpoint de métricas
+
+- **Local:** Actuator vive en el puerto de management **8081**, que el compose no publica. Solo Prometheus lo alcanza por la red interna (`app:8081/actuator/prometheus`, cada 15 s), sin credenciales.
+- **Render:** publica un solo puerto, así que en el perfil `prod` Actuator lo comparte con la API. `/actuator/prometheus` exige HTTP Basic con `METRICS_USERNAME` / `METRICS_PASSWORD`; Grafana Cloud lo lee cada 1 minuto con la integración Metrics Endpoint. Si falta `METRICS_PASSWORD`, la app no arranca.
+- Los probes `/livez` y `/readyz` se sirven en el puerto principal para el health check de Render.
+
+### Dashboard
+
+El dashboard tiene 5 filas.
+
+#### Resumen y Negocio
+
+**Resumen** muestra de un vistazo si la API está sana: requests por segundo, % de 5xx, p95, SLO de latencia (% de requests en menos de 300 ms), usuarios activos en 15 min, hit ratio de caché y estado del circuito. Con la caché fría cada miss va a SWAPI, que tarda cerca de 1 s; los hits responden en pocos ms, así que el p95 y el SLO mejoran a medida que sube el hit ratio.
+
+**Negocio** muestra qué consultan los usuarios: consultas por recurso, uso de filtros (`none`, `id`, `name`, `id_and_name`), top 10 entidades más vistas, % de búsquedas sin resultados, profundidad de paginación y logins exitosos contra fallidos.
+
+#### API
+
+Tasa de requests por endpoint, errores por status y latencia p50 / p95 / p99, total y por endpoint. Los endpoints se agrupan por URI template: `/people/1` y `/people/2` son una sola serie. `UNKNOWN` agrupa los requests rechazados antes del ruteo, como un 401 sin token.
+
+#### SWAPI y resiliencia
+
+- **SWAPI vs API (p95):** cuando la línea de la API queda debajo de la de SWAPI, la caché está absorbiendo la latencia del proveedor.
+- **Respuestas de SWAPI por status** y **Cache gets:** hits y misses de cada cache (`swapi-list`, `swapi-search`, `swapi-detail`).
+- **Retries:** llamadas a SWAPI según si necesitaron reintento y si terminaron bien.
+- **Circuit breaker:** llamadas exitosas, fallidas, ignoradas (4xx) y rechazadas con el circuito abierto, más la tasa de fallas y de llamadas lentas que usa para abrirse (50% y 80%). El panel queda vacío hasta que el circuito junta 10 llamadas.
+
+#### JVM
+
+Heap usado, comprometido y máximo, pausas de GC y CPU del proceso y del sistema. El máximo es de unos 6 GiB porque la imagen usa `-XX:MaxRAMPercentage=75` y en local el contenedor ve toda la VM de Docker Desktop; en Render el mismo flag da unos 384 MB.
+
+Alertas provisionadas en Prometheus: circuito abierto más de 1 min, más de 5% de 5xx en 5 min y más de 20 logins fallidos en 5 min.
+
+### Métricas de negocio
+
+| Métrica | Tipo | Tags | Pregunta que responde |
+|---|---|---|---|
+| `catalog.queries` | Counter | `resource`, `filter` (`none`, `id`, `name`, `id_and_name`) | ¿Qué se consulta y cómo se filtra? |
+| `catalog.entity.views` | Counter | `resource`, `entity` | ¿Qué entidades son las más consultadas? |
+| `catalog.searches.empty` | Counter | `resource` | ¿Qué porcentaje de búsquedas no encuentra nada? |
+| `catalog.page.requested` | DistributionSummary | `resource` | ¿Hasta qué página navegan? |
+| `auth.login.attempts` | Counter | `result` (`success`, `failure`) | ¿Hay intentos de fuerza bruta? |
+| `auth.active.users` | Gauge | — | ¿Cuántos usuarios distintos hubo en 15 min? |
+
+Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics` y `AuthMetrics`; los controllers no conocen Micrometer.
+
+**Regla de cardinalidad:** cada combinación de tags es una serie distinta en Prometheus, así que los tags solo toman valores de un conjunto acotado. El texto que escribe el usuario nunca es un tag: una búsqueda por `name=luke` cuenta como `filter=name`, no como `name=luke`. `entity` se registra solo después de resolver una entidad con éxito, y su valor viene de SWAPI (unas 160 entidades), no del input. Por el mismo motivo las llamadas a SWAPI usan URI template, para que el tag `uri` de `http.client.requests` no tenga un valor por ID.
+
+### Logs y correlación
+
+- `CorrelationIdFilter` corre primero en la cadena: reusa el `X-Request-Id` del request si es corto y alfanumérico, o genera un UUID. Lo pone en el MDC y lo devuelve en el header `X-Request-Id`.
+- El mismo ID aparece en cada línea de log del request y en el campo `requestId` de los errores, así una respuesta fallida se cruza con su log.
+- En local los logs son texto legible; en `prod` son JSON con formato ECS.
+- Nunca se loguean contraseñas, tokens ni el header `Authorization`.
+
 ## Seguridad
 
 - **Login:** `AuthenticationManager` + `DaoAuthenticationProvider`, con contraseñas en BCrypt guardadas en H2 ([ADR-005](docs/adr/ADR-005.md)). Usuario inexistente y contraseña incorrecta devuelven el mismo error.
 - **Token:** JWT HS256 de 1 h con `iss`, `sub`, `iat`, `exp` y `scope: catalog:read`. Lo valida el OAuth2 Resource Server de Spring: firma, expiración e issuer ([ADR-004](docs/adr/ADR-004.md)).
 - **Autorización:** los endpoints del catálogo exigen el scope `catalog:read`; estar autenticado no alcanza.
-- **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI y `/actuator/health` e `/actuator/info`. Cualquier otra ruta sin token responde 401.
+- **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI y los probes `/livez` y `/readyz`. Cualquier otra ruta sin token responde 401.
+- **Métricas:** en local Actuator vive en el puerto de management (8081), que no se publica. En Render comparte el puerto público y `/actuator/prometheus` exige HTTP Basic con un usuario propio, que no sirve para llamar a la API ([ADR-015](docs/adr/ADR-015.md)).
 - **CSRF deshabilitado:** la API es stateless y no usa cookies. El token viaja en el header `Authorization`, que el navegador no envía por su cuenta, así que no hay superficie para CSRF.
-- **Fail fast:** en `prod` la app no arranca sin `JWT_SECRET` (mínimo 32 bytes) ni `DEMO_USER_PASSWORD`.
+- **Fail fast:** en `prod` la app no arranca sin `JWT_SECRET` (mínimo 32 bytes), `DEMO_USER_PASSWORD` ni `METRICS_PASSWORD` (mínimo 16 caracteres).
 - **Swagger UI público en producción** ([ADR-017](docs/adr/ADR-017.md)): la página carga sin token, pero cada llamada al catálogo lo exige.
 
 ## Arquitectura
@@ -228,7 +310,7 @@ dev.starwars
 ├── auth/       login, JWT y usuarios (api · service · domain · security)
 ├── catalog/    controllers, CatalogService y Paginator (api · service · domain)
 ├── swapi/      cliente de SWAPI: el único paquete que conoce su formato
-├── common/     manejo de errores (ProblemDetail)
+├── common/     manejo de errores (ProblemDetail) y correlation ID
 └── config/     RestClient, OpenAPI, reloj
 ```
 
@@ -257,6 +339,7 @@ flowchart LR
 | `SwapiRestClient` | Integración con stub | WireMock |
 | Flujo punta a punta (`CatalogFlowIT`, `SecurityIT`) | `*IT` | `@SpringBootTest` con puerto aleatorio + WireMock |
 | Caché, retry y circuit breaker (`SwapiResilienceIT`) | `*IT` | WireMock con escenarios y `CircuitBreakerRegistry` |
+| Puerto de management y scrape protegido (`ManagementPortIT`, `MetricsScrapeIT`) | `*IT` | `@SpringBootTest` + `@LocalManagementPort` |
 
 SWAPI se simula con WireMock usando respuestas reales guardadas en `src/test/resources/swapi/` ([ADR-009](docs/adr/ADR-009.md)). Para regenerar una:
 
