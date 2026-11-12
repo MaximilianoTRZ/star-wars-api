@@ -1,6 +1,10 @@
 # Production profile: no defaults for secrets.
 # The app fails to start if JWT_SECRET, DEMO_USER_PASSWORD or METRICS_PASSWORD is missing.
 app:
+  # Render's public traffic goes through Cloudflare, which sets CF-Connecting-IP to the real client IP and
+  # overwrites any value the client sends. X-Forwarded-For is not trusted: its first value comes from the client.
+  client-ip:
+    header: CF-Connecting-IP
   security:
     jwt:
       secret: ${JWT_SECRET}
@@ -34,9 +38,3 @@ logging:
         # Root cause first and a bounded size, so one error does not flood the Render log view
         root: first
         max-length: 8192
-
-# Behind Render's proxy: the client IP (used by the login rate limit) comes from X-Forwarded-For.
-# Render appends the real client IP to whatever the client sent, so the leftmost value can be spoofed.
-# Tomcat's RemoteIpValve ("native") reads the list from the right and skips internal proxies.
-server:
-  forward-headers-strategy: native

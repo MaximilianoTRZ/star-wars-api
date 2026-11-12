@@ -20,11 +20,11 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Login rate limit on the running app, with the production limit (5 per minute) and client IPs taken from
- * {@code X-Forwarded-For} as in {@code prod}: Render's proxy appends the real IP to the header the client sent.
+ * {@code CF-Connecting-IP} as in {@code prod}, where Cloudflare sets it in front of Render.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"app.security.login-rate-limit.capacity=5", "server.forward-headers-strategy=native"})
+        properties = {"app.security.login-rate-limit.capacity=5", "app.client-ip.header=CF-Connecting-IP"})
 @ActiveProfiles("test")
 @ExtendWith(OutputCaptureExtension.class)
 class LoginRateLimitIT {
@@ -44,7 +44,7 @@ class LoginRateLimitIT {
                 .build()
                 .post()
                 .uri("/api/v1/auth/login")
-                .header("X-Forwarded-For", ip)
+                .header("CF-Connecting-IP", ip)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(BODY)
                 .retrieve()
@@ -84,13 +84,21 @@ class LoginRateLimitIT {
     @Test
     @DisplayName("a client cannot dodge the limit by sending its own X-Forwarded-For")
     void spoofedForwardedForIsIgnored() {
-        for (int i = 0; i < 5; i++) {
-            assertThat(loginFrom("198.51.100." + i + ", 203.0.113.30").getStatusCode())
-                    .isEqualTo(HttpStatus.OK);
+        for (int i = 0; i < 6; i++) {
+            ResponseEntity<String> response = RestClient.builder()
+                    .baseUrl("http://localhost:" + port)
+                    .defaultStatusHandler(status -> true, (request, resp) -> {})
+                    .build()
+                    .post()
+                    .uri("/api/v1/auth/login")
+                    .header("X-Forwarded-For", "198.51.100." + i)
+                    .header("CF-Connecting-IP", "203.0.113.30")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(BODY)
+                    .retrieve()
+                    .toEntity(String.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(i < 5 ? HttpStatus.OK : HttpStatus.TOO_MANY_REQUESTS);
         }
-
-        ResponseEntity<String> sixth = loginFrom("198.51.100.99, 203.0.113.30");
-
-        assertThat(sixth.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 }

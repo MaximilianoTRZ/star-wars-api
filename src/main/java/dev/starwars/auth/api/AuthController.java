@@ -3,6 +3,7 @@ package dev.starwars.auth.api;
 import dev.starwars.auth.service.AuthMetrics;
 import dev.starwars.auth.service.TokenService;
 import dev.starwars.auth.service.TokenService.IssuedToken;
+import dev.starwars.common.web.ClientIpResolver;
 import dev.starwars.common.web.RequestLoggingFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -34,12 +35,17 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
     private final AuthMetrics authMetrics;
+    private final ClientIpResolver clientIpResolver;
 
     public AuthController(
-            AuthenticationManager authenticationManager, TokenService tokenService, AuthMetrics authMetrics) {
+            AuthenticationManager authenticationManager,
+            TokenService tokenService,
+            AuthMetrics authMetrics,
+            ClientIpResolver clientIpResolver) {
         this.authenticationManager = authenticationManager;
         this.tokenService = tokenService;
         this.authMetrics = authMetrics;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/login")
@@ -55,10 +61,11 @@ public class AuthController {
                     UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()));
         } catch (AuthenticationException ex) {
             authMetrics.loginFailed();
+            String clientIp = clientIpResolver.resolve(httpRequest);
             log.atWarn()
                     .setMessage("Login failed from {}")
-                    .addArgument(httpRequest.getRemoteAddr())
-                    .addKeyValue("client.ip", httpRequest.getRemoteAddr())
+                    .addArgument(clientIp)
+                    .addKeyValue("client.ip", clientIp)
                     .log();
             throw ex;
         }
