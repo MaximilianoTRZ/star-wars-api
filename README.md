@@ -4,6 +4,32 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=coverage)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
 
+> **Back-end JAVA Challenge**
+>
+> **Objetivo:**
+> Desarrollar una aplicación Java21 que se integre con la API de Star Wars (https://www.swapi.tech/documentation). La aplicación debe listar People, Films, Starships y Vehicles de manera paginada, permitir filtrado por ID y/o nombre, y contar con un sistema de autenticación seguro. Además, la aplicación debe estar bien documentada y contener pruebas unitarias y de integración.
+>
+> **Requisitos:**
+>
+> 1. **Integración con la API de Star Wars:**
+>     - La aplicación debe conectarse a la API de Star Wars y obtener datos de People, Films, Starships y Vehicles.
+> 2. **Listado de Entidades:**
+>     - Implementar funcionalidades para listar People, Films, Starships y Vehicles.
+>     - La lista debe ser paginada para manejar grandes cantidades de datos.
+> 3. **Filtrado:**
+>     - Permitir el filtrado de resultados por ID y/o nombre.
+> 4. **Autenticación Segura:**
+>     - Implementar un sistema de login seguro.
+>     - Manejo adecuado de autenticación y autorización para acceder a las listas.
+> 5. **Documentación:**
+>     - La aplicación debe estar bien documentada, incluyendo instrucciones para la configuración y uso del sistema.
+>     - La documentación del código debe ser clara y detallada.
+> 6. **Pruebas Unitarias y de Integración:**
+>     - La aplicación debe contener pruebas unitarias para garantizar el correcto funcionamiento de las unidades de código.
+>     - Incluir pruebas de integración para asegurar que los componentes trabajen correctamente juntos.
+> 7. **Despliegue:**
+>     - Se recomienda desplegar la aplicación en algún servidor gratuito, como Heroku o Vercel, para facilitar la prueba de la app.
+
 API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starships y Vehicles con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. Java 21 + Spring Boot 4.1.
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
