@@ -395,7 +395,7 @@ El dashboard **Star Wars API** queda como home de Grafana, sin pasos manuales: d
 
 ### Dashboard
 
-Las capturas son de Render (Grafana Cloud) durante la prueba de carga de [Resiliencia y caché](#prueba-de-carga), con la caché ya caliente. El dashboard tiene 5 filas.
+Las capturas son de Render (Grafana Cloud) durante la prueba de carga de [Resiliencia y caché](#prueba-de-carga), con la caché ya caliente. El dashboard tiene 6 filas; la de alertas se describe en [Alertas](#alertas).
 
 #### Resumen y Negocio
 
@@ -464,6 +464,12 @@ Provisionadas en Prometheus desde [`monitoring/alerts.yml`](monitoring/alerts.ym
 ![Alertas en Prometheus con FailedLoginSpike disparada](docs/images/prometheus-alerts.png)
 
 La captura es del stack local después de una ráfaga de logins con contraseña incorrecta: `FailedLoginSpike` pasa a `FIRING` y las otras dos siguen inactivas.
+
+**En producción:** en Render no corre Prometheus, así que no hay página `/alerts`. El estado de las tres alertas se ve en la fila **Alerts** del [dashboard público](https://magentaosprey3543.grafana.net/public-dashboards/c1eb26ffdec84e1fa902aa1efc509e6f), debajo de Resumen: un panel por alerta, con la misma expresión de `alerts.yml`, en verde (`OK`) o en rojo (`FIRING`). Muestra si la condición se cumple ahora, sin la espera (`for`) que aplica Prometheus antes de disparar. Para verla cambiar, alcanza con más de 20 logins con contraseña incorrecta en 5 minutos: `FailedLoginSpike` pasa a `FIRING` en el próximo scrape (cada 1 minuto).
+
+![Fila Alerts del dashboard con FailedLoginSpike disparada](docs/images/grafana-alerts.png)
+
+La captura es de la fila **Alerts** después de una ráfaga de logins con contraseña incorrecta: `FailedLoginSpike` en `FIRING` y las otras dos en `OK`.
 
 ### Métricas de negocio
 
