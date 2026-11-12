@@ -77,7 +77,7 @@ class LoginRateLimitIT {
                         .count())
                 .isEqualTo(blockedBefore + 1);
         assertThat(output)
-                .containsPattern("WARN .*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s")
-                .containsPattern("INFO .*POST /api/v1/auth/login 429");
+                .containsPattern("WARN.*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s")
+                .containsPattern("INFO.*POST /api/v1/auth/login 429");
     }
 }

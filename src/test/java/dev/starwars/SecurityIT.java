@@ -86,7 +86,7 @@ class SecurityIT {
         String token = TestTokens.sign(TEST_SECRET, "star-wars-api", Instant.now(), Duration.ofMinutes(5), null);
 
         assertThat(api.get("/api/v1/people", token).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(output).containsPattern("INFO .*Request forbidden").doesNotContain(token);
+        assertThat(output).containsPattern("INFO.*Request forbidden").doesNotContain(token);
     }
 
     @Test

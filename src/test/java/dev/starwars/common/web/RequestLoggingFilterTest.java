@@ -30,7 +30,7 @@ class RequestLoggingFilterTest {
             ((MockHttpServletResponse) res).setStatus(200);
         });
 
-        assertThat(output).containsPattern("INFO .*GET /api/v1/people/\\{id} 200 \\d+ms");
+        assertThat(output).containsPattern("INFO.*GET /api/v1/people/\\{id} 200 \\d+ms");
         assertThat(output).doesNotContain("secret=value");
     }
 
@@ -55,7 +55,7 @@ class RequestLoggingFilterTest {
                 new MockHttpServletResponse(),
                 (req, res) -> ((MockHttpServletResponse) res).setStatus(503));
 
-        assertThat(output).containsPattern("WARN .*GET /api/v1/films 503");
+        assertThat(output).containsPattern("WARN.*GET /api/v1/films 503");
     }
 
     @ParameterizedTest

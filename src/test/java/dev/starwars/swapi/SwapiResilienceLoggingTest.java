@@ -22,7 +22,7 @@ class SwapiResilienceLoggingTest {
 
         SwapiResilienceLogging.onIgnoredError(new RetryOnIgnoredErrorEvent("swapi", timeout));
 
-        assertThat(output).containsPattern("WARN .*SWAPI call failed and is not retried \\(TIMEOUT\\)");
+        assertThat(output).containsPattern("WARN.*SWAPI call failed and is not retried \\(TIMEOUT\\)");
     }
 
     @Test
@@ -43,7 +43,7 @@ class SwapiResilienceLoggingTest {
                 new CircuitBreakerOnStateTransitionEvent("swapi", StateTransition.HALF_OPEN_TO_CLOSED));
 
         assertThat(output)
-                .containsPattern("WARN .*changed from CLOSED to OPEN")
-                .containsPattern("INFO .*changed from HALF_OPEN to CLOSED");
+                .containsPattern("WARN.*changed from CLOSED to OPEN")
+                .containsPattern("INFO.*changed from HALF_OPEN to CLOSED");
     }
 }

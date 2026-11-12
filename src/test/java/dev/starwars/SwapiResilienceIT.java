@@ -210,8 +210,8 @@ class SwapiResilienceIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         swapi.verify(3, getRequestedFor(urlEqualTo("/api/people/1")));
         assertThat(output)
-                .containsPattern("WARN .*SWAPI call failed after 3 attempts \\(SERVER_ERROR\\)")
-                .containsPattern("WARN .*GET /api/v1/people/\\{id} 503");
+                .containsPattern("WARN.*SWAPI call failed after 3 attempts \\(SERVER_ERROR\\)")
+                .containsPattern("WARN.*GET /api/v1/people/\\{id} 503");
     }
 
     @Test
@@ -271,7 +271,7 @@ class SwapiResilienceIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(elapsed).isLessThan(Duration.ofSeconds(4));
         swapi.verify(1, getRequestedFor(urlEqualTo("/api/people/1")));
-        assertThat(output).containsPattern("WARN .*SWAPI call failed and is not retried \\(TIMEOUT\\)");
+        assertThat(output).containsPattern("WARN.*SWAPI call failed and is not retried \\(TIMEOUT\\)");
     }
 
     @Test
@@ -292,7 +292,7 @@ class SwapiResilienceIT {
         assertThat(JsonPath.<String>read(response.getBody(), "$.type")).isEqualTo("/problems/upstream-unavailable");
         assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("30");
         assertThat(swapi.getAllServeEvents()).hasSize(requestsBefore);
-        assertThat(output).containsPattern("WARN .*SWAPI circuit breaker changed from CLOSED to OPEN");
+        assertThat(output).containsPattern("WARN.*SWAPI circuit breaker changed from CLOSED to OPEN");
     }
 
     @Test

@@ -81,8 +81,8 @@ class AuthControllerTest {
 
         String token = JsonPath.read(ok.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.accessToken");
         assertThat(output)
-                .containsPattern("INFO .*Login succeeded for demo")
-                .containsPattern("WARN .*Login failed from ")
+                .containsPattern("INFO.*Login succeeded for demo")
+                .containsPattern("WARN.*Login failed from ")
                 .doesNotContain("demo123")
                 .doesNotContain("typed-secret")
                 .doesNotContain("wrong-secret")
