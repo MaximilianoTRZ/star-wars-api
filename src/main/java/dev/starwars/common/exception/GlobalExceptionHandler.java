@@ -4,16 +4,13 @@ import dev.starwars.catalog.domain.ResourceNotFoundException;
 import dev.starwars.swapi.SwapiClientException;
 import dev.starwars.swapi.UpstreamUnavailableException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -44,12 +41,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI ABOUT_BLANK = URI.create("about:blank");
 
     private final ProblemDetailFactory problems;
-    private final ObjectProvider<CircuitBreakerRegistry> circuitBreakers;
+    private final CircuitRetryAfter circuitRetryAfter;
 
-    public GlobalExceptionHandler(
-            ProblemDetailFactory problems, ObjectProvider<CircuitBreakerRegistry> circuitBreakers) {
+    public GlobalExceptionHandler(ProblemDetailFactory problems, CircuitRetryAfter circuitRetryAfter) {
         this.problems = problems;
-        this.circuitBreakers = circuitBreakers;
+        this.circuitRetryAfter = circuitRetryAfter;
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -91,16 +87,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CallNotPermittedException.class)
     ResponseEntity<ProblemDetail> handleCircuitOpen(CallNotPermittedException ex, HttpServletRequest request) {
         HttpHeaders headers = new HttpHeaders();
-        CircuitBreakerRegistry registry = circuitBreakers.getIfAvailable();
-        if (registry != null) {
-            long waitMillis = registry.circuitBreaker(ex.getCausingCircuitBreakerName())
-                    .getCircuitBreakerConfig()
-                    .getWaitIntervalFunctionInOpenState()
-                    .apply(1);
-            headers.set(
-                    HttpHeaders.RETRY_AFTER,
-                    String.valueOf(Duration.ofMillis(waitMillis).toSeconds()));
-        }
+        circuitRetryAfter.of(ex).ifPresent(d -> headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(d.toSeconds())));
         return respond(
                 problems.create(
                         HttpStatus.SERVICE_UNAVAILABLE,

@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 @WebMvcTest(ErrorTestController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import({GlobalExceptionHandler.class, ProblemDetailFactory.class, ClockConfig.class})
+@Import({GlobalExceptionHandler.class, ProblemDetailFactory.class, CircuitRetryAfter.class, ClockConfig.class})
 class GlobalExceptionHandlerTest {
 
     private static final String ABOUT_BLANK = "about:blank";

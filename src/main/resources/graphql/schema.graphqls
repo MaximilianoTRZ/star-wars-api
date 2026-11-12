@@ -1,0 +1,180 @@
+"""
+Star Wars catalog from SWAPI: people, films, starships and vehicles.
+Listings are paginated and filter by id and/or name; the detail queries return every attribute.
+Every query requires the JWT from POST /api/v1/auth/login in the Authorization header.
+"""
+type Query {
+  "Paginated list of people. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
+  people(
+    "1-based page number"
+    page: Int! = 1
+    "Page size (1-100)"
+    size: Int! = 10
+    "Exact SWAPI id"
+    id: ID
+    "Text the name must contain"
+    name: String
+  ): PersonPage!
+
+  "Person detail. An unknown id returns null with a NOT_FOUND error."
+  person("SWAPI id" id: ID!): Person
+
+  "Paginated list of films. Filter by id and/or title (case-insensitive contains). An unknown id returns an empty page."
+  films(
+    "1-based page number"
+    page: Int! = 1
+    "Page size (1-100)"
+    size: Int! = 10
+    "Exact SWAPI id"
+    id: ID
+    "Text the title must contain"
+    title: String
+  ): FilmPage!
+
+  "Film detail. An unknown id returns null with a NOT_FOUND error."
+  film("SWAPI id" id: ID!): Film
+
+  "Paginated list of starships. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
+  starships(
+    "1-based page number"
+    page: Int! = 1
+    "Page size (1-100)"
+    size: Int! = 10
+    "Exact SWAPI id"
+    id: ID
+    "Text the name must contain"
+    name: String
+  ): StarshipPage!
+
+  "Starship detail. An unknown id returns null with a NOT_FOUND error."
+  starship("SWAPI id" id: ID!): Starship
+
+  "Paginated list of vehicles. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
+  vehicles(
+    "1-based page number"
+    page: Int! = 1
+    "Page size (1-100)"
+    size: Int! = 10
+    "Exact SWAPI id"
+    id: ID
+    "Text the name must contain"
+    name: String
+  ): VehiclePage!
+
+  "Vehicle detail. An unknown id returns null with a NOT_FOUND error."
+  vehicle("SWAPI id" id: ID!): Vehicle
+}
+
+"Person as shown in listings"
+type PersonSummary {
+  id: ID!
+  name: String
+}
+
+"Person detail. Values are kept as text, as SWAPI returns them (e.g. \"unknown\")."
+type Person {
+  id: ID!
+  name: String
+  height: String
+  mass: String
+  hairColor: String
+  skinColor: String
+  eyeColor: String
+  birthYear: String
+  gender: String
+}
+
+"Page of people. An out-of-range page has an empty content and the real totals."
+type PersonPage {
+  content: [PersonSummary!]!
+  page: Int!
+  size: Int!
+  totalElements: Int!
+  totalPages: Int!
+}
+
+"Film as shown in listings"
+type FilmSummary {
+  id: ID!
+  title: String
+}
+
+"Film detail"
+type Film {
+  id: ID!
+  title: String
+  episodeId: Int
+  director: String
+  producer: String
+  releaseDate: String
+  openingCrawl: String
+}
+
+"Page of films. An out-of-range page has an empty content and the real totals."
+type FilmPage {
+  content: [FilmSummary!]!
+  page: Int!
+  size: Int!
+  totalElements: Int!
+  totalPages: Int!
+}
+
+"Starship as shown in listings"
+type StarshipSummary {
+  id: ID!
+  name: String
+}
+
+"Starship detail. Values are kept as text, as SWAPI returns them (e.g. \"n/a\")."
+type Starship {
+  id: ID!
+  name: String
+  model: String
+  manufacturer: String
+  starshipClass: String
+  costInCredits: String
+  length: String
+  crew: String
+  passengers: String
+  cargoCapacity: String
+  hyperdriveRating: String
+  mglt: String
+}
+
+"Page of starships. An out-of-range page has an empty content and the real totals."
+type StarshipPage {
+  content: [StarshipSummary!]!
+  page: Int!
+  size: Int!
+  totalElements: Int!
+  totalPages: Int!
+}
+
+"Vehicle as shown in listings"
+type VehicleSummary {
+  id: ID!
+  name: String
+}
+
+"Vehicle detail. Values are kept as text, as SWAPI returns them."
+type Vehicle {
+  id: ID!
+  name: String
+  model: String
+  manufacturer: String
+  vehicleClass: String
+  costInCredits: String
+  length: String
+  crew: String
+  passengers: String
+  cargoCapacity: String
+}
+
+"Page of vehicles. An out-of-range page has an empty content and the real totals."
+type VehiclePage {
+  content: [VehicleSummary!]!
+  page: Int!
+  size: Int!
+  totalElements: Int!
+  totalPages: Int!
+}

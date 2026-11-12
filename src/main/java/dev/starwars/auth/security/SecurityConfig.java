@@ -29,13 +29,14 @@ import org.springframework.security.web.SecurityFilterChain;
  * API security filter chain (ADR-004).
  *
  * <ul>
- *   <li><b>Deny by default:</b> only login, the OpenAPI docs and the {@code /livez} and {@code /readyz} probes
- *       are public; any other route is rejected.</li>
+ *   <li><b>Deny by default:</b> only login, the OpenAPI docs, Swagger UI, GraphiQL and the {@code /livez} and
+ *       {@code /readyz} probes are public; any other route is rejected. The documentation pages load without a
+ *       token, but every call they make to the catalog needs one (ADR-017).</li>
  *   <li><b>Actuator:</b> its own chain. Locally it runs on a management port that is never published and is
  *       open; in {@code prod} it shares the public port and {@code /actuator/prometheus} requires HTTP Basic
  *       with the scrape credentials ({@link MetricsScrapeProperties}).</li>
- *   <li><b>Authorization:</b> {@code /api/v1/**} requires the {@code SCOPE_catalog:read} authority, taken
- *       from the JWT {@code scope} claim. Being authenticated is not enough.</li>
+ *   <li><b>Authorization:</b> {@code /api/v1/**} and {@code /graphql} require the {@code SCOPE_catalog:read}
+ *       authority, taken from the JWT {@code scope} claim. Being authenticated is not enough.</li>
  *   <li><b>Stateless:</b> no HTTP session. CSRF is disabled because there are no cookies: the token travels
  *       in the {@code Authorization} header, which browsers never send on their own.</li>
  *   <li><b>Errors:</b> 401 and 403 return {@code ProblemDetail}, like the rest of the API.</li>
@@ -110,11 +111,13 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
                         .permitAll()
+                        .requestMatchers("/graphiql", "/graphiql/**")
+                        .permitAll()
                         .requestMatchers("/livez", "/readyz")
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
-                        .requestMatchers("/api/v1/**")
+                        .requestMatchers("/api/v1/**", "/graphql")
                         .hasAuthority("SCOPE_" + CATALOG_READ_SCOPE)
                         .anyRequest()
                         .denyAll())

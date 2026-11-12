@@ -1,8 +1,8 @@
 package dev.starwars.catalog.api;
 
-import static dev.starwars.catalog.api.CatalogApi.ID_MESSAGE;
-import static dev.starwars.catalog.api.CatalogApi.ID_PATTERN;
-import static dev.starwars.catalog.api.CatalogApi.MAX_FILTER_LENGTH;
+import static dev.starwars.catalog.domain.CatalogConstraints.ID_MESSAGE;
+import static dev.starwars.catalog.domain.CatalogConstraints.ID_PATTERN;
+import static dev.starwars.catalog.domain.CatalogConstraints.MAX_FILTER_LENGTH;
 
 import dev.starwars.catalog.domain.CatalogResource;
 import dev.starwars.catalog.domain.PageRequestParams;

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.ApiClient;
+import dev.starwars.support.Logs;
 import dev.starwars.support.TestTokens;
 import java.time.Duration;
 import java.time.Instant;
@@ -75,9 +76,8 @@ class SecurityIT {
         String requestId = response.getHeaders().getFirst("X-Request-Id");
         assertThat(requestId).isNotBlank();
         assertThat(JsonPath.<String>read(response.getBody(), "$.requestId")).isEqualTo(requestId);
-        assertThat(output)
-                .containsPattern("\\[" + requestId + "] .*Request rejected as unauthenticated")
-                .containsPattern("\\[" + requestId + "] .*GET /api/v1/people 401");
+        assertThat(output).containsPattern("\\[" + requestId + "] .*Request rejected as unauthenticated");
+        Logs.awaitPattern(output, "\\[" + requestId + "] .*GET /api/v1/people 401");
     }
 
     @Test

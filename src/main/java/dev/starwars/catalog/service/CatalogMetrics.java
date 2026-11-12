@@ -1,5 +1,6 @@
 package dev.starwars.catalog.service;
 
+import dev.starwars.catalog.domain.CatalogChannel;
 import dev.starwars.catalog.domain.CatalogResource;
 import dev.starwars.catalog.domain.SearchCriteria;
 import io.micrometer.core.instrument.Counter;
@@ -27,12 +28,13 @@ public class CatalogMetrics {
         this.registry = registry;
     }
 
-    /** Counts a listing by resource and kind of filter. */
+    /** Counts a listing by resource, kind of filter and channel (REST or GraphQL). */
     public void queryExecuted(CatalogResource resource, SearchCriteria criteria) {
         Counter.builder(QUERIES)
-                .description("Catalog listings by resource and filter kind")
+                .description("Catalog listings by resource, filter kind and channel")
                 .tag("resource", resource.label())
                 .tag("filter", filter(criteria))
+                .tag("channel", CatalogChannel.current().label())
                 .register(registry)
                 .increment();
     }

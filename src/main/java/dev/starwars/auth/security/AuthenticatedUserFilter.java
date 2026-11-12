@@ -19,9 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>Added to the API security chain right after the bearer token filter. Only the {@code sub} claim is logged,
  * never the token.
  */
-class AuthenticatedUserFilter extends OncePerRequestFilter {
+public class AuthenticatedUserFilter extends OncePerRequestFilter {
 
-    static final String MDC_KEY = "user";
+    public static final String MDC_KEY = "user";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)

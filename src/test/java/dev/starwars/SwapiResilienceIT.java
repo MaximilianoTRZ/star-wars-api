@@ -14,6 +14,7 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.ApiClient;
 import dev.starwars.support.Fixtures;
+import dev.starwars.support.Logs;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.time.Duration;
@@ -196,8 +197,8 @@ class SwapiResilienceIT {
         assertThat(output)
                 .containsPattern(
                         "\\[" + requestId + "] .*SWAPI attempt 1/3 failed \\(SERVER_ERROR\\), retrying in \\d+ms")
-                .containsPattern("\\[" + requestId + "] .*SWAPI call succeeded on attempt 2")
-                .containsPattern("\\[" + requestId + "] .*GET /api/v1/people/\\{id} 200 \\d+ms");
+                .containsPattern("\\[" + requestId + "] .*SWAPI call succeeded on attempt 2");
+        Logs.awaitPattern(output, "\\[" + requestId + "] .*GET /api/v1/people/\\{id} 200 \\d+ms");
     }
 
     @Test
@@ -209,9 +210,8 @@ class SwapiResilienceIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         swapi.verify(3, getRequestedFor(urlEqualTo("/api/people/1")));
-        assertThat(output)
-                .containsPattern("WARN.*SWAPI call failed after 3 attempts \\(SERVER_ERROR\\)")
-                .containsPattern("WARN.*GET /api/v1/people/\\{id} 503");
+        assertThat(output).containsPattern("WARN.*SWAPI call failed after 3 attempts \\(SERVER_ERROR\\)");
+        Logs.awaitPattern(output, "WARN.*GET /api/v1/people/\\{id} 503");
     }
 
     @Test

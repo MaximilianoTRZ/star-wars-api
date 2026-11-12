@@ -18,6 +18,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: create-drop
+  graphql:
+    graphiql:
+      # Public in every profile, like Swagger UI (ADR-017): every query to /graphql still needs the JWT
+      enabled: true
   web:
     # Validation and error messages always in English
     locale: en
