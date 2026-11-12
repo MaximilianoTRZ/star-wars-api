@@ -6,7 +6,7 @@
 
 API REST en Java 21 + Spring Boot 4.1 que expone People, Films, Starships y Vehicles de [SWAPI](https://www.swapi.tech) con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. Se entrega como repositorio público, con la app desplegada en una URL pública.
 
-La Fase 1 cumple todos los requisitos funcionales y es entregable por sí sola. Las Fases 2 a 5 suman resiliencia, observabilidad, extras de seguridad y dos formas nuevas de consumir el catálogo (GraphQL y MCP), sin tocar el contrato REST. La calidad de código (SonarCloud, cobertura, reglas de arquitectura, formato) se verifica en CI desde el primer commit.
+La Fase 1 cumple todos los requisitos funcionales y es entregable por sí sola. Las Fases 2 a 6 suman resiliencia, observabilidad, extras de seguridad y dos formas nuevas de consumir el catálogo (GraphQL en la Fase 5 y MCP en la Fase 6), sin tocar el contrato REST. La calidad de código (SonarCloud, cobertura, reglas de arquitectura, formato) se verifica en CI desde el primer commit.
 
 ### Requisitos → solución
 
@@ -97,7 +97,7 @@ dev.starwars
     └── web/         CorrelationIdFilter
 ```
 
-En la Fase 5 se suman `catalog/graphql/` y `catalog/mcp/`, como adaptadores hermanos de `catalog/api/`.
+En la Fase 5 se suma `catalog/graphql/` y en la Fase 6 `catalog/mcp/`, como adaptadores hermanos de `catalog/api/`.
 
 ### Convenciones de API
 
@@ -148,7 +148,8 @@ En la Fase 5 se suman `catalog/graphql/` y `catalog/mcp/`, como adaptadores herm
 | 2 — Resiliencia y caché | `v1.1.0` |
 | 3 — Observabilidad | `v1.2.0` |
 | 4 — Extras | `v1.3.0` |
-| 5 — GraphQL / MCP | `v1.4.0` / `v1.5.0` |
+| 5 — GraphQL | `v1.4.0` |
+| 6 — Servidor MCP | `v1.5.0` |
 
 ### Definition of Done de una work unit
 
@@ -266,7 +267,7 @@ Boot 4 renombró y dividió starters: `spring-boot-starter-web` pasa a `-webmvc`
 | Métricas | `micrometer-registry-prometheus` | Boot | F3 |
 | Rate limiting | `com.bucket4j:bucket4j_jdk17-core` | 8.x, explícita | F4 |
 | GraphQL | `spring-boot-starter-graphql`, `spring-graphql-test` | Boot | F5 |
-| MCP | Starter de servidor MCP para WebMVC de Spring AI 2.x | Se confirma en Initializr | F5 |
+| MCP | Starter de servidor MCP para WebMVC de Spring AI 2.x | Se confirma en Initializr | F6 |
 
 Plugins de build: `jacoco-maven-plugin`, `spotless-maven-plugin`, `maven-failsafe-plugin` y `sonar-maven-plugin` (este último solo se invoca desde CI).
 
@@ -712,26 +713,20 @@ Disparador: un `WARN` de connect timeout en Render cuya request respondió 200 p
 - [x] Logging de producción con ADR-018 y su sección en el README
 - [x] Tag `v1.3.0`
 
-## 9. Fase 5 — GraphQL y MCP sobre el mismo servicio (~4-5 h, tags `v1.4.0` y `v1.5.0`)
+## 9. Fase 5 — GraphQL (~2 h, tag `v1.4.0`)
 
-Objetivo: sumar dos formas nuevas de consumir el mismo catálogo sin duplicar lógica. Primero GraphQL; después un servidor MCP para que clientes de IA (Claude, Cursor) consulten el catálogo. Los dos son adaptadores sobre `CatalogService`, igual que los controllers REST (ADR-016).
+Objetivo: sumar una forma nueva de consumir el mismo catálogo sin duplicar lógica. GraphQL es un adaptador sobre `CatalogService`, igual que los controllers REST (ADR-016). La Fase 6 suma MCP con el mismo criterio y arranca recién cuando esta fase está mergeada, taggeada y probada en Render.
 
 ```
 REST controllers ──┐
 GraphQL resolvers ─┼──▶ CatalogService ──▶ SwapiClient (caché + resiliencia)
-MCP tools ─────────┘
+MCP tools (F6) ────┘
 ```
-
-| WU | Qué | Esfuerzo | Tag |
-| --- | --- | --- | --- |
-| 5.1 | GraphQL + GraphiQL | ~2 h | `v1.4.0` |
-| 5.2 | Servidor MCP | ~2-3 h | `v1.5.0` |
 
 ### Deploy
 
-- Mismo jar, misma imagen Docker y mismo servicio de Render. Solo aparecen `/graphql`, `/graphiql` y `/mcp` en el mismo puerto. No hay infraestructura ni variables de entorno nuevas.
-- El servidor MCP no llama a ningún modelo: solo expone tools, y el modelo lo pone el cliente. No hace falta API key.
-- Costo: más dependencias hacen más lento el arranque en el plan free (0,1 CPU, 512 MB). Después de cada WU se miden el tiempo de arranque y la memoria, y se anotan en el README.
+- Mismo jar, misma imagen Docker y mismo servicio de Render. Solo aparecen `/graphql` y `/graphiql` en el mismo puerto. No hay infraestructura ni variables de entorno nuevas.
+- Costo: una dependencia más hace más lento el arranque en el plan free (0,1 CPU, 512 MB). Al cerrar la fase se miden el tiempo de arranque y la memoria, y se anotan en el README.
 
 ### WU 5.1 — GraphQL
 
@@ -752,11 +747,40 @@ type PersonPage { content: [PersonSummary!]!, page: Int!, size: Int!, totalEleme
 
 - Errores mapeados con `DataFetcherExceptionResolver` a los mismos códigos de negocio que la API REST (`NOT_FOUND`, `BAD_REQUEST`, `UNAVAILABLE`), con el `requestId` en las extensiones.
 - **GraphiQL público en todos los perfiles, incluido `prod`**, en `/graphiql` (ADR-017). La página carga sin token, igual que Swagger UI; cada query a `/graphql` exige el JWT, que se pega en el panel de headers (`{"Authorization": "Bearer <token>"}`). `SecurityConfig` suma `/graphiql` y sus assets a las rutas públicas.
-- Métricas: `catalog.queries` suma el tag `channel` (`rest`, `graphql`, `mcp`), un conjunto acotado.
+- Métricas: `catalog.queries` suma el tag `channel` (`rest`, `graphql`; `mcp` en la Fase 6), un conjunto acotado.
 - **Tests:** `@GraphQlTest` en slice para resolvers y errores; `HttpGraphQlTester` en un IT con JWT y WireMock; `/graphiql` carga sin token y `/graphql` sin token devuelve 401.
 - README: cómo usar GraphiQL en Render, una query de ejemplo y el curl con el token.
 
-### WU 5.2 — Servidor MCP
+### SOLID en esta fase
+
+- **O:** un canal nuevo sin modificar `CatalogService`, `SwapiClient` ni los controllers REST.
+- **S:** los resolvers solo traducen entre GraphQL y `CatalogService`; el mapeo de errores vive en su propio `DataFetcherExceptionResolver`.
+- **D:** el adaptador depende del servicio de aplicación, no de SWAPI ni de los controllers REST.
+
+### Cierre de la fase
+
+- Colección Postman actualizada (carpeta GraphQL) y corrida completa contra Render.
+- PR `chore: release 1.4.0`, tag `v1.4.0` y release.
+
+### Salida de la fase
+
+- [ ] `/graphql` funcionando en la URL de Render, protegido con JWT
+- [ ] GraphiQL (`/graphiql`) accesible en la URL de Render, junto a Swagger UI (`/swagger-ui.html`)
+- [ ] Tests del adaptador GraphQL en verde
+- [ ] Tiempo de arranque y memoria medidos y anotados en el README
+- [ ] Tag `v1.4.0`
+
+## 10. Fase 6 — Servidor MCP (~2-3 h, tag `v1.5.0`)
+
+Objetivo: que clientes de IA (Claude, Cursor) consulten el catálogo a través de un servidor MCP. Es el tercer adaptador sobre `CatalogService` (ADR-016). Arranca con la Fase 5 cerrada y probada en Render.
+
+### Deploy
+
+- Mismo jar, misma imagen Docker y mismo servicio de Render. Solo aparece `/mcp` en el mismo puerto. No hay infraestructura ni variables de entorno nuevas.
+- El servidor MCP no llama a ningún modelo: solo expone tools, y el modelo lo pone el cliente. No hace falta API key.
+- Al cerrar la fase se vuelven a medir el tiempo de arranque y la memoria, y se actualizan en el README.
+
+### WU 6.1 — Servidor MCP
 
 - Spring AI 2.x (compatible con Boot 4) con el starter de servidor MCP para WebMVC; el nombre exacto del artefacto se confirma en Initializr.
 - Transporte HTTP streamable en `/mcp`.
@@ -769,24 +793,24 @@ type PersonPage { content: [PersonSummary!]!, page: Int!, size: Int!, totalEleme
 
 ### SOLID en esta fase
 
-- **O:** dos canales nuevos sin modificar `CatalogService`, `SwapiClient` ni los controllers REST.
-- **S:** los resolvers y las tools solo traducen entre su protocolo y `CatalogService`; el mapeo de errores de GraphQL vive en su propio `DataFetcherExceptionResolver`.
+- **O:** un canal nuevo sin modificar `CatalogService`, `SwapiClient`, los controllers REST ni los resolvers GraphQL.
+- **S:** las tools solo traducen entre MCP y `CatalogService`.
 - **D:** los tres adaptadores dependen del mismo servicio de aplicación, no de SWAPI ni entre ellos.
 
 ### Cierre de la fase
 
-- Colección Postman actualizada en cada WU (carpeta GraphQL en 5.1, carpeta MCP en 5.2) y corrida completa contra Render.
-- Un release por WU: PR `chore: release 1.4.0` al cerrar 5.1 y `chore: release 1.5.0` al cerrar 5.2, cada uno con su tag y release.
+- Colección Postman actualizada (carpeta MCP) y corrida completa contra Render.
+- PR `chore: release 1.5.0`, tag `v1.5.0` y release.
 
 ### Salida de la fase
 
-- [ ] `/graphql` y `/mcp` funcionando en la URL de Render, protegidos con JWT
-- [ ] Swagger UI (`/swagger-ui.html`) y GraphiQL (`/graphiql`) accesibles en la URL de Render
-- [ ] Tests de los dos adaptadores en verde
-- [ ] Tiempo de arranque y memoria medidos y anotados en el README
-- [ ] Tags `v1.4.0` (GraphQL) y `v1.5.0` (MCP)
+- [ ] `/mcp` funcionando en la URL de Render, protegido con JWT
+- [ ] Tests del adaptador MCP en verde
+- [ ] Probado desde Claude Code contra Render
+- [ ] Tiempo de arranque y memoria actualizados en el README
+- [ ] Tag `v1.5.0`
 
-## 10. Decisiones, riesgos y fuentes
+## 11. Decisiones, riesgos y fuentes
 
 ### Registro de decisiones (ADRs)
 
@@ -820,8 +844,8 @@ Cada decisión tiene su archivo en [`docs/adr/`](adr/).
 | SWAPI lenta o caída durante la revisión | El reviewer ve errores | Caché (F2), circuit breaker con 503 claro, aviso en el README |
 | Rate limit de SWAPI (100 requests por IP, IP compartida en Render) | 429 bajo uso intensivo | Caché; retry si el `Retry-After` es corto; si no, 503 con el `Retry-After` de SWAPI |
 | Cold start de Render | El primer request tarda o da timeout | Aviso en el README; desde la Fase 3 el scrape de Grafana Cloud mantiene la instancia despierta |
-| Incompatibilidad de una librería con Boot 4 | Bloquea una fase | Versiones verificadas (springdoc 3.1.1, resilience4j-spring-boot4 2.4.0, wiremock-standalone 3.13.2); Spring AI se confirma en Initializr antes de la WU 5.2 |
-| Arranque más lento en el free tier al sumar GraphQL y MCP | Health check de Render vencido | Medición después de cada WU de la Fase 5; ajustar el timeout del health check si hace falta |
+| Incompatibilidad de una librería con Boot 4 | Bloquea una fase | Versiones verificadas (springdoc 3.1.1, resilience4j-spring-boot4 2.4.0, wiremock-standalone 3.13.2); Spring AI se confirma en Initializr antes de la Fase 6 |
+| Arranque más lento en el free tier al sumar GraphQL y MCP | Health check de Render vencido | Medición al cerrar las Fases 5 y 6; ajustar el timeout del health check si hace falta |
 | Tiempo | Fases incompletas | Cada fase cierra entregable y taggeada; se corta por fase, nunca por calidad |
 
 ### Fuentes

@@ -4,6 +4,32 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=MaximilianoTRZ_star-wars-api&metric=coverage)](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api)
 
+> **Back-end JAVA Challenge**
+>
+> **Objetivo:**
+> Desarrollar una aplicación Java21 que se integre con la API de Star Wars (https://www.swapi.tech/documentation). La aplicación debe listar People, Films, Starships y Vehicles de manera paginada, permitir filtrado por ID y/o nombre, y contar con un sistema de autenticación seguro. Además, la aplicación debe estar bien documentada y contener pruebas unitarias y de integración.
+>
+> **Requisitos:**
+>
+> 1. **Integración con la API de Star Wars:**
+>     - La aplicación debe conectarse a la API de Star Wars y obtener datos de People, Films, Starships y Vehicles.
+> 2. **Listado de Entidades:**
+>     - Implementar funcionalidades para listar People, Films, Starships y Vehicles.
+>     - La lista debe ser paginada para manejar grandes cantidades de datos.
+> 3. **Filtrado:**
+>     - Permitir el filtrado de resultados por ID y/o nombre.
+> 4. **Autenticación Segura:**
+>     - Implementar un sistema de login seguro.
+>     - Manejo adecuado de autenticación y autorización para acceder a las listas.
+> 5. **Documentación:**
+>     - La aplicación debe estar bien documentada, incluyendo instrucciones para la configuración y uso del sistema.
+>     - La documentación del código debe ser clara y detallada.
+> 6. **Pruebas Unitarias y de Integración:**
+>     - La aplicación debe contener pruebas unitarias para garantizar el correcto funcionamiento de las unidades de código.
+>     - Incluir pruebas de integración para asegurar que los componentes trabajen correctamente juntos.
+> 7. **Despliegue:**
+>     - Se recomienda desplegar la aplicación en algún servidor gratuito, como Heroku o Vercel, para facilitar la prueba de la app.
+
 API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starships y Vehicles con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. Java 21 + Spring Boot 4.1.
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
@@ -17,8 +43,24 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 3 | Filtrado por ID y/o nombre | `CatalogService` elige la estrategia según la combinación de filtros |
 | 4 | Login seguro, autenticación y autorización | JWT HS256 emitido por `POST /api/v1/auth/login` y validado con OAuth2 Resource Server; scope `catalog:read`; contraseñas con BCrypt |
 | 5 | Documentación | Este README, Swagger UI, Javadoc, el [RFC](docs/RFC.md) y los [ADRs](docs/adr/) |
-| 6 | Tests unitarios y de integración | 131 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
+| 6 | Tests unitarios y de integración | 204 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
 | 7 | Despliegue | Docker multi-stage en Render, con deploy automático desde `main` |
+
+## Cómo se construyó
+
+**El MVP ([Fase 1, `v1.0.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.0.0)) cumple todos los requisitos del challenge** (la tabla de arriba). A partir de ahí, el alcance se amplió por fases con prácticas que consideré necesarias para que una API así funcione bien en producción: tolerar un proveedor lento y con rate limit, ver qué pasa adentro y endurecer la seguridad, sin cambiar el contrato REST. Cada fase terminó con un release taggeado y desplegado en Render.
+
+| Fase | Release | Qué se sumó | Por qué | Detalle |
+|---|---|---|---|---|
+| 0 | [`v0.1.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v0.1.0) | Esqueleto desplegable: CI, Docker, Render, SonarCloud, JaCoCo (80%), ArchUnit, Spotless, Dependabot | Calidad verificada desde el primer commit y deploy desde el día uno | [Calidad](#calidad) |
+| 1 | [`v1.0.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.0.0) | **MVP:** cliente SWAPI, paginación uniforme, filtros por ID y/o nombre, login JWT con scope, errores Problem Details, OpenAPI, tests y colección Postman | Requisitos del challenge | [Uso](#uso), [Errores](#errores), [Seguridad](#seguridad) |
+| 2 | [`v1.1.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.1.0) | Caché Caffeine, retry y circuit breaker sobre el cliente de SWAPI | SWAPI tarda entre 2 y 9 s desde Render y tiene rate limit | [Resiliencia y caché](#resiliencia-y-caché) |
+| 3 | [`v1.2.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.2.0) | Métricas técnicas y de negocio, correlation ID, Prometheus y Grafana como código, dashboard público | Saber qué pasa en producción sin entrar al servidor | [Observabilidad](#observabilidad) |
+| 4 | [`v1.3.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.3.0) | Rate limiting del login, logging de producción, notas de escalabilidad | Frenar fuerza bruta y diagnosticar desde los logs de Render | [Seguridad](#seguridad), [Logs](#logs-y-correlación), [Escalabilidad](#cómo-lo-escalaría) |
+| 5 | `v1.4.0` (en curso) | GraphQL y GraphiQL sobre el mismo `CatalogService` | Consultas con la forma que pide el cliente, sin duplicar lógica | [RFC §9](docs/RFC.md#9-fase-5--graphql-2-h-tag-v140) |
+| 6 | `v1.5.0` (planificada) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [RFC §10](docs/RFC.md#10-fase-6--servidor-mcp-2-3-h-tag-v150) |
+
+El detalle de cada fase (work units, tests, decisiones SOLID y criterios de salida) está en el [RFC](docs/RFC.md); las decisiones de diseño, en los [ADRs](#decisiones-de-diseño).
 
 ## Demo
 
