@@ -10,6 +10,14 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 
 ## Quick start
 
+### Con Docker
+
+```bash
+docker build -t star-wars-api .
+docker run -p 8080:8080 star-wars-api
+curl http://localhost:8080/actuator/health
+```
+
 ### Con Maven
 
 ```bash
