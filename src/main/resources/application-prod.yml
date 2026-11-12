@@ -23,3 +23,7 @@ logging:
   structured:
     format:
       console: ecs
+
+# Behind Render's proxy: the client IP (used by the login rate limit) comes from X-Forwarded-For.
+server:
+  forward-headers-strategy: framework

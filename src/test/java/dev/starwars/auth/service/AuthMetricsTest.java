@@ -31,6 +31,7 @@ class AuthMetricsTest {
         metrics.loginSucceeded("demo");
         metrics.loginFailed();
         metrics.loginFailed();
+        metrics.loginBlocked();
 
         assertThat(registry.get(AuthMetrics.LOGIN_ATTEMPTS)
                         .tag("result", "success")
@@ -42,6 +43,11 @@ class AuthMetricsTest {
                         .counter()
                         .count())
                 .isEqualTo(2);
+        assertThat(registry.get(AuthMetrics.LOGIN_ATTEMPTS)
+                        .tag("result", "blocked")
+                        .counter()
+                        .count())
+                .isEqualTo(1);
     }
 
     @Test

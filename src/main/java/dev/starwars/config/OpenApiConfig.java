@@ -87,6 +87,7 @@ public class OpenApiConfig {
                 addProblem(responses, "400", "Invalid parameters");
                 if (path.equals(LOGIN_PATH)) {
                     addProblem(responses, "401", "Invalid username or password");
+                    addProblem(responses, "429", "Too many login attempts from this client");
                     continue;
                 }
                 addProblem(responses, "401", "Missing, invalid or expired token");

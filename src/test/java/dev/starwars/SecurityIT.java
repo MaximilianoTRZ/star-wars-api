@@ -106,7 +106,7 @@ class SecurityIT {
         assertThat(JsonPath.<Map<String, Object>>read(docs, "$.paths['/api/v1/people/{id}'].get.responses"))
                 .containsKeys("200", "401", "403", "404", "503");
         assertThat(JsonPath.<Map<String, Object>>read(docs, "$.paths['/api/v1/auth/login'].post.responses"))
-                .containsKeys("200", "400", "401")
+                .containsKeys("200", "400", "401", "429")
                 .doesNotContainKey("403");
         assertThat(
                         JsonPath.<String>read(

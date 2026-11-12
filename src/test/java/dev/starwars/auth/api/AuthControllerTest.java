@@ -22,7 +22,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
-@WebMvcTest(AuthController.class)
+// The login rate limit is covered by LoginRateLimitIT; here it would block the repeated logins
+@WebMvcTest(controllers = AuthController.class, properties = "app.security.login-rate-limit.capacity=1000")
 @Import(WebSliceTestConfig.class)
 class AuthControllerTest {
 

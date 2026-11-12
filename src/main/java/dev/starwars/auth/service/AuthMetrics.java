@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.stereotype.Component;
 
 /**
- * Login metrics: attempts by result and distinct users who logged in during the last 15 minutes.
+ * Login metrics: attempts by result ({@code success}, {@code failure}, {@code blocked}) and distinct users who logged in during the last 15 minutes.
  *
  * <p>Usernames are kept only in memory to count them; they are never a tag.
  */
@@ -24,11 +24,13 @@ public class AuthMetrics {
 
     private final Counter successes;
     private final Counter failures;
+    private final Counter blocked;
     private final Cache<String, Boolean> activeUsers;
 
     public AuthMetrics(MeterRegistry registry, Clock clock) {
         this.successes = loginAttempts(registry, "success");
         this.failures = loginAttempts(registry, "failure");
+        this.blocked = loginAttempts(registry, "blocked");
         this.activeUsers = Caffeine.newBuilder()
                 .expireAfterWrite(ACTIVE_WINDOW)
                 .ticker(() -> TimeUnit.MILLISECONDS.toNanos(clock.millis()))
@@ -45,6 +47,11 @@ public class AuthMetrics {
 
     public void loginFailed() {
         failures.increment();
+    }
+
+    /** A login attempt rejected by the rate limiter, before checking the credentials. */
+    public void loginBlocked() {
+        blocked.increment();
     }
 
     private static Counter loginAttempts(MeterRegistry registry, String result) {

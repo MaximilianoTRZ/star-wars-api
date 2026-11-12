@@ -1,5 +1,6 @@
 package dev.starwars.auth.security;
 
+import dev.starwars.auth.service.AuthMetrics;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -121,6 +122,13 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler));
         return http.build();
+    }
+
+    /** Rate limit on login, applied as a servlet filter before the security chain. */
+    @Bean
+    LoginRateLimitFilter loginRateLimitFilter(
+            LoginRateLimiter limiter, ProblemDetailResponseWriter writer, AuthMetrics metrics) {
+        return new LoginRateLimitFilter(limiter, writer, metrics);
     }
 
     /**
