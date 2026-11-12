@@ -50,4 +50,27 @@ class ProblemDetailFactoryTest {
 
         assertThat(problem.getProperties()).containsEntry("timestamp", "2020-01-01T00:00:00Z");
     }
+
+    @Test
+    @DisplayName("toMap flattens the standard fields and the extra properties")
+    void toMapFlattens() {
+        ProblemDetail problem = factory.create(HttpStatus.UNAUTHORIZED, "unauthorized", "Unauthorized", "No token");
+        problem.setInstance(URI.create("/api/v1/people"));
+
+        assertThat(factory.toMap(problem))
+                .containsEntry("type", "/problems/unauthorized")
+                .containsEntry("title", "Unauthorized")
+                .containsEntry("status", 401)
+                .containsEntry("detail", "No token")
+                .containsEntry("instance", "/api/v1/people")
+                .containsEntry("timestamp", NOW.toString());
+    }
+
+    @Test
+    @DisplayName("toMap uses about:blank when the problem has no type")
+    void toMapDefaultsType() {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+
+        assertThat(factory.toMap(problem)).containsEntry("type", "about:blank").doesNotContainKey("instance");
+    }
 }

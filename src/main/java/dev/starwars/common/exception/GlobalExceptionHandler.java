@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -48,6 +49,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ResponseEntity<ProblemDetail> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         return respond(
                 problems.create(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found", ex.getMessage()),
+                request,
+                HttpHeaders.EMPTY);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
+        return respond(
+                problems.create(
+                        HttpStatus.UNAUTHORIZED,
+                        "invalid-credentials",
+                        "Invalid credentials",
+                        "Invalid username or password"),
                 request,
                 HttpHeaders.EMPTY);
     }

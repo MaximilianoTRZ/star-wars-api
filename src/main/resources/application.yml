@@ -4,6 +4,14 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: jdbc:h2:mem:starwars;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
   web:
     # Validation and error messages always in English
     locale: en
@@ -15,6 +23,16 @@ app:
     connect-timeout: 2s
     # SWAPI takes 2 to 9 s per request from Render
     read-timeout: 10s
+  security:
+    jwt:
+      # Local development default only. The prod profile requires JWT_SECRET.
+      secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789}
+      issuer: star-wars-api
+      ttl: 1h
+    demo-user:
+      username: demo
+      # Local development default only. The prod profile requires DEMO_USER_PASSWORD.
+      password: ${DEMO_USER_PASSWORD:demo123}
 
 management:
   endpoints:
