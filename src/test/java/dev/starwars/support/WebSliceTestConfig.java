@@ -4,6 +4,7 @@ import dev.starwars.auth.security.JwtConfig;
 import dev.starwars.auth.security.SecurityConfig;
 import dev.starwars.auth.service.AuthMetrics;
 import dev.starwars.auth.service.TokenService;
+import dev.starwars.common.exception.CircuitRetryAfter;
 import dev.starwars.common.exception.ProblemDetailFactory;
 import dev.starwars.common.web.ClientIpProperties;
 import dev.starwars.common.web.ClientIpResolver;
@@ -27,6 +28,7 @@ import org.springframework.context.annotation.Import;
     JwtConfig.class,
     ClockConfig.class,
     ProblemDetailFactory.class,
+    CircuitRetryAfter.class,
     TokenService.class,
     AuthMetrics.class,
     ClientIpResolver.class

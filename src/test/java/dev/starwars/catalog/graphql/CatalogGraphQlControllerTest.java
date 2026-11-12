@@ -5,15 +5,22 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import dev.starwars.catalog.domain.CatalogItem;
 import dev.starwars.catalog.domain.CatalogResource;
 import dev.starwars.catalog.domain.PageRequestParams;
 import dev.starwars.catalog.domain.PageResponse;
+import dev.starwars.catalog.domain.ResourceNotFoundException;
 import dev.starwars.catalog.domain.SearchCriteria;
 import dev.starwars.catalog.service.CatalogService;
+import dev.starwars.common.exception.CircuitRetryAfter;
+import dev.starwars.common.exception.GraphQlExceptionResolver;
 import dev.starwars.common.exception.ProblemDetailFactory;
 import dev.starwars.config.ClockConfig;
+import dev.starwars.swapi.SwapiClientException;
+import dev.starwars.swapi.UpstreamUnavailableException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +32,7 @@ import org.springframework.graphql.test.tester.GraphQlTester;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @GraphQlTest(CatalogGraphQlController.class)
-@Import({ProblemDetailFactory.class, ClockConfig.class})
+@Import({GraphQlExceptionResolver.class, ProblemDetailFactory.class, CircuitRetryAfter.class, ClockConfig.class})
 class CatalogGraphQlControllerTest {
 
     private static final CatalogItem LUKE = new CatalogItem(
@@ -155,5 +162,102 @@ class CatalogGraphQlControllerTest {
                 .path("vehicles.content[0].id")
                 .entity(String.class)
                 .isEqualTo("4");
+    }
+
+    @Test
+    @DisplayName("an unknown id returns null and a NOT_FOUND error with the REST problem type")
+    void notFound() {
+        given(catalogService.getById(CatalogResource.PEOPLE, "9999"))
+                .willThrow(new ResourceNotFoundException(CatalogResource.PEOPLE, "9999"));
+
+        graphQlTester
+                .document("{ person(id: 9999) { name } }")
+                .execute()
+                .errors()
+                .satisfy(errors -> {
+                    assertThat(errors).singleElement().satisfies(error -> {
+                        assertThat(error.getErrorType()).hasToString("NOT_FOUND");
+                        assertThat(error.getMessage()).isEqualTo("No people found with id 9999");
+                        assertThat(error.getPath()).isEqualTo("person");
+                        assertThat(error.getExtensions())
+                                .containsEntry("type", "/problems/resource-not-found")
+                                .containsKey("timestamp");
+                    });
+                })
+                .path("person")
+                .valueIsNull();
+    }
+
+    @Test
+    @DisplayName("invalid arguments return BAD_REQUEST with every violation, without calling the service")
+    void validation() {
+        graphQlTester
+                .document("{ people(page: 0, size: 500, id: \"abc\") { totalElements } }")
+                .execute()
+                .errors()
+                .satisfy(errors -> assertThat(errors).singleElement().satisfies(error -> {
+                    assertThat(error.getErrorType()).hasToString("BAD_REQUEST");
+                    assertThat(error.getExtensions()).containsEntry("type", "/problems/validation-error");
+                    assertThat((List<Map<String, String>>) error.getExtensions().get("errors"))
+                            .extracting(violation -> violation.get("field"))
+                            .containsExactly("id", "page", "size");
+                }));
+
+        verifyNoInteractions(catalogService);
+    }
+
+    @Test
+    @DisplayName("SWAPI down returns UNAVAILABLE with retryAfter when SWAPI sent one")
+    void upstreamUnavailable() {
+        given(catalogService.getById(CatalogResource.FILMS, "1"))
+                .willThrow(new UpstreamUnavailableException(
+                        "rate limited",
+                        UpstreamUnavailableException.Reason.RATE_LIMITED,
+                        Duration.ofSeconds(30),
+                        null));
+
+        graphQlTester
+                .document("{ film(id: 1) { title } }")
+                .execute()
+                .errors()
+                .satisfy(errors -> assertThat(errors).singleElement().satisfies(error -> {
+                    assertThat(error.getErrorType()).hasToString("UNAVAILABLE");
+                    assertThat(error.getExtensions())
+                            .containsEntry("type", "/problems/upstream-unavailable")
+                            .containsEntry("retryAfter", 30L);
+                }));
+    }
+
+    @Test
+    @DisplayName("an unprocessable SWAPI response returns BAD_GATEWAY")
+    void upstreamError() {
+        given(catalogService.getById(CatalogResource.STARSHIPS, "9")).willThrow(new SwapiClientException("bad body"));
+
+        graphQlTester
+                .document("{ starship(id: 9) { name } }")
+                .execute()
+                .errors()
+                .satisfy(errors -> assertThat(errors).singleElement().satisfies(error -> {
+                    assertThat(error.getErrorType()).hasToString("BAD_GATEWAY");
+                    assertThat(error.getExtensions()).containsEntry("type", "/problems/upstream-error");
+                    assertThat(error.getMessage()).doesNotContain("bad body");
+                }));
+    }
+
+    @Test
+    @DisplayName("an unexpected error returns INTERNAL_ERROR without internal details")
+    void unexpected() {
+        given(catalogService.getById(CatalogResource.VEHICLES, "4"))
+                .willThrow(new IllegalStateException("database password is hunter2"));
+
+        graphQlTester
+                .document("{ vehicle(id: 4) { name } }")
+                .execute()
+                .errors()
+                .satisfy(errors -> assertThat(errors).singleElement().satisfies(error -> {
+                    assertThat(error.getErrorType()).hasToString("INTERNAL_ERROR");
+                    assertThat(error.getMessage()).isEqualTo("An unexpected error occurred.");
+                    assertThat(error.getExtensions()).containsEntry("type", "/problems/internal-error");
+                }));
     }
 }

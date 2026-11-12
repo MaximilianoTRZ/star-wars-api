@@ -1,5 +1,6 @@
 package dev.starwars;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -18,9 +19,12 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
@@ -32,6 +36,7 @@ import org.springframework.test.context.DynamicPropertySource;
 /** GraphQL over HTTP against the running app: real login, security chain and a stubbed SWAPI. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class GraphQlIT {
 
     private static final String TEST_SECRET = "test-secret-0123456789-0123456789-0123456789";
@@ -86,6 +91,36 @@ class GraphQlIT {
         assertThat(JsonPath.<String>read(detail.getBody(), "$.data.person.birthYear"))
                 .isEqualTo("19BBY");
         assertThat(detail.getBody()).doesNotContain("\"errors\"");
+    }
+
+    @Test
+    @DisplayName("errors carry the REST problem type and the request ID of the header and the logs")
+    void errorsAreCorrelated(CapturedOutput output) {
+        swapi.stubFor(get(urlEqualTo("/api/people/9999"))
+                .willReturn(aResponse()
+                        .withStatus(404)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(Fixtures.swapi("not-found.json"))));
+        swapi.stubFor(get(urlEqualTo("/api/films/1")).willReturn(aResponse().withStatus(500)));
+        String token = api.login("demo", "test-password");
+
+        ResponseEntity<String> missing = api.graphql("{ person(id: 9999) { name } }", token);
+        String missingId = missing.getHeaders().getFirst("X-Request-Id");
+        assertThat(JsonPath.<String>read(missing.getBody(), "$.errors[0].extensions.classification"))
+                .isEqualTo("NOT_FOUND");
+        assertThat(JsonPath.<String>read(missing.getBody(), "$.errors[0].extensions.requestId"))
+                .isNotBlank()
+                .isEqualTo(missingId);
+
+        ResponseEntity<String> down = api.graphql("{ film(id: 1) { title } }", token);
+        String downId = down.getHeaders().getFirst("X-Request-Id");
+        assertThat(JsonPath.<String>read(down.getBody(), "$.errors[0].extensions.type"))
+                .isEqualTo("/problems/upstream-unavailable");
+        assertThat(JsonPath.<String>read(down.getBody(), "$.errors[0].extensions.requestId"))
+                .isEqualTo(downId);
+        assertThat(output)
+                .containsPattern("\\[" + downId + "] .*SWAPI attempt 1/3 failed")
+                .containsPattern("\\[" + downId + "] .*POST /graphql 200");
     }
 
     @Test
