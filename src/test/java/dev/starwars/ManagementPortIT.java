@@ -33,7 +33,8 @@ class ManagementPortIT {
     }
 
     @Test
-    @DisplayName("the Prometheus endpoint exposes HTTP, cache, resilience and JVM metrics with the application tag")
+    @DisplayName(
+            "the Prometheus endpoint exposes HTTP, cache, resilience, JVM and login metrics with the application tag")
     void prometheus() {
         new ApiClient(port).get("/livez", null);
 
@@ -46,7 +47,9 @@ class ManagementPortIT {
                 .contains("cache_gets_total")
                 .contains("resilience4j_circuitbreaker_state")
                 .contains("resilience4j_retry_calls_total")
-                .contains("jvm_memory_used_bytes");
+                .contains("jvm_memory_used_bytes")
+                .contains("auth_active_users")
+                .contains("auth_login_attempts_total");
     }
 
     @Test

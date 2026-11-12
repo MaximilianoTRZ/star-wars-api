@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
 import dev.starwars.support.WebSliceTestConfig;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,9 @@ class AuthControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private MeterRegistry registry;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -61,6 +65,26 @@ class AuthControllerTest {
         assertThat(result).bodyJson().extractingPath("$.tokenType").isEqualTo("Bearer");
         assertThat(result).bodyJson().extractingPath("$.expiresIn").isEqualTo(3600);
         assertThat(result).bodyJson().extractingPath("$.accessToken").asString().contains(".");
+    }
+
+    @Test
+    @DisplayName("records login attempts by result")
+    void recordsAttempts() {
+        double successes = attempts("success");
+        double failures = attempts("failure");
+
+        login("{\"username\":\"demo\",\"password\":\"demo123\"}");
+        login("{\"username\":\"demo\",\"password\":\"wrong\"}");
+
+        assertThat(attempts("success")).isEqualTo(successes + 1);
+        assertThat(attempts("failure")).isEqualTo(failures + 1);
+    }
+
+    private double attempts(String result) {
+        return registry.get("auth.login.attempts")
+                .tag("result", result)
+                .counter()
+                .count();
     }
 
     @Test

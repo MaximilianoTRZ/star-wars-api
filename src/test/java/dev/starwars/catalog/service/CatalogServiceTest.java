@@ -19,6 +19,7 @@ import dev.starwars.swapi.ResourceType;
 import dev.starwars.swapi.SwapiClient;
 import dev.starwars.swapi.SwapiEntity;
 import dev.starwars.swapi.SwapiPage;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,11 +39,14 @@ class CatalogServiceTest {
     @Mock
     private SwapiClient swapiClient;
 
+    private SimpleMeterRegistry registry;
+
     private CatalogService service;
 
     @BeforeEach
     void setUp() {
-        service = new CatalogService(swapiClient);
+        registry = new SimpleMeterRegistry();
+        service = new CatalogService(swapiClient, new CatalogMetrics(registry));
     }
 
     private static SwapiEntity person(String uid, String name) {
@@ -256,6 +260,70 @@ class CatalogServiceTest {
     void mapsEveryResource() {
         for (CatalogResource resource : CatalogResource.values()) {
             assertThat(CatalogService.toSwapi(resource).name()).isEqualTo(resource.name());
+        }
+    }
+
+    @Nested
+    @DisplayName("metrics")
+    class Metrics {
+
+        @Test
+        @DisplayName("counts the query by resource and filter, and records the page")
+        void countsQuery() {
+            given(swapiClient.search(ResourceType.PEOPLE, "sky")).willReturn(List.of(person("1", "Luke Skywalker")));
+
+            service.find(CatalogResource.PEOPLE, new SearchCriteria(null, "sky"), new PageRequestParams(3, 10));
+
+            assertThat(registry.get(CatalogMetrics.QUERIES)
+                            .tags("resource", "people", "filter", "name")
+                            .counter()
+                            .count())
+                    .isEqualTo(1);
+            assertThat(registry.get(CatalogMetrics.PAGE_REQUESTED)
+                            .tag("resource", "people")
+                            .summary()
+                            .max())
+                    .isEqualTo(3);
+            assertThat(registry.find(CatalogMetrics.EMPTY_SEARCHES).counter()).isNull();
+        }
+
+        @Test
+        @DisplayName("counts a name search without results as empty")
+        void countsEmptySearch() {
+            given(swapiClient.search(ResourceType.FILMS, "nothing")).willReturn(List.of());
+
+            service.find(CatalogResource.FILMS, new SearchCriteria(null, "nothing"), FIRST_PAGE);
+
+            assertThat(registry.get(CatalogMetrics.EMPTY_SEARCHES)
+                            .tag("resource", "films")
+                            .counter()
+                            .count())
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("tags the entity view with the name from SWAPI, not the requested ID")
+        void countsEntityView() {
+            given(swapiClient.findById(ResourceType.PEOPLE, "1"))
+                    .willReturn(Optional.of(person("1", "Luke Skywalker")));
+
+            service.getById(CatalogResource.PEOPLE, "1");
+
+            assertThat(registry.get(CatalogMetrics.ENTITY_VIEWS)
+                            .tags("resource", "people", "entity", "Luke Skywalker")
+                            .counter()
+                            .count())
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("does not count an entity view when the entity does not exist")
+        void noEntityViewOnNotFound() {
+            given(swapiClient.findById(ResourceType.PEOPLE, "999")).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getById(CatalogResource.PEOPLE, "999"))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThat(registry.find(CatalogMetrics.ENTITY_VIEWS).counter()).isNull();
         }
     }
 }
