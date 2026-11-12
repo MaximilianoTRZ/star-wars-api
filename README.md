@@ -86,7 +86,7 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **REST desde Swagger UI:** abrir `POST /api/v1/auth/login` y apretar **Execute**: el body ya trae el usuario demo del entorno (en Render, la contraseña de arriba; en local, `demo123`) y el `accessToken` de la respuesta se carga solo en **Authorize**. Después se puede llamar a cualquier endpoint del catálogo sin copiar el token; los formularios ya vienen en modo *Try it out*.
 
-**Desde Claude Code (MCP):** con el `TOKEN` del comando de arriba, `claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"` y preguntarle, por ejemplo, "¿qué naves aparecen en A New Hope?". Más detalle en [MCP](#mcp).
+**Desde Claude Code (MCP):** con el `TOKEN` del comando de arriba, `claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"` y preguntarle, por ejemplo, "comparame el Halcón Milenario con la Estrella de la Muerte". Hay más preguntas de ejemplo en [MCP](#mcp).
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST, GraphQL y MCP) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
@@ -354,7 +354,25 @@ TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/js
 claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"
 ```
 
-Después, en Claude Code: "¿qué naves aparecen en A New Hope?" o "comparame el Halcón Milenario con la Estrella de la Muerte". `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+Después, en Claude Code, se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+
+**Preguntas de ejemplo y las tools que usa el modelo para responderlas.** Las búsquedas devuelven solo `id` y nombre, así que para cualquier atributo el modelo encadena una búsqueda con un `get_*`:
+
+| Pregunta | Tools que usa |
+|---|---|
+| ¿Quiénes son los Skywalker? | `search_people(name: "skywalker")` |
+| ¿Cuánto mide Darth Vader y de qué color tiene los ojos? | `search_people(name: "vader")` → `get_person(id: "4")` |
+| ¿Quién dirigió El Imperio Contraataca y cuándo se estrenó? | `search_films(title: "empire")` → `get_film(id: "2")` |
+| Mostrame el texto de apertura de A New Hope | `search_films(title: "hope")` → `get_film(id: "1")` |
+| Ordená las películas por número de episodio | `search_films()` → `get_film` por cada una (el episodio está en el detalle) |
+| Comparame el Halcón Milenario con la Estrella de la Muerte: costo, tripulación y hyperdrive | `search_starships(name: "falcon")` y `search_starships(name: "death")` → `get_starship(id: "10")` y `get_starship(id: "9")` |
+| ¿Cuántas naves y cuántos vehículos hay en el catálogo? | `search_starships(size: 1)` y `search_vehicles(size: 1)`, y lee `totalElements` |
+| ¿Qué es el Sand Crawler y cuánto cuesta? | `search_vehicles(name: "sand")` → `get_vehicle(id: "4")` |
+| ¿Quiénes son los Organa? | `search_people(name: "organa")` |
+| Mostrame la página 3 de personajes, de a 5 | `search_people(page: 3, size: 5)` |
+| ¿Existe el personaje con id 9999? | `get_person(id: "9999")`: responde que no existe y sugiere usar las búsquedas |
+
+El catálogo no tiene relaciones entre recursos: el detalle de una película no lista sus personajes ni sus naves, y el de un personaje no dice en qué películas aparece. Preguntas como "¿qué naves aparecen en A New Hope?" no se pueden responder con estas tools.
 
 **Desde Claude Desktop:** los conectores remotos de Claude Desktop no permiten agregar headers, así que se usa el proxy [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) en `claude_desktop_config.json`, reemplazando `<token>`:
 
