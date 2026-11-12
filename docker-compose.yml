@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    image: star-wars-api:local
+    ports:
+      - "8080:8080"
+    # Optional: without .env the app uses the local development defaults
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
