@@ -184,7 +184,7 @@ class GraphQlIT {
     }
 
     @Test
-    @DisplayName("GraphiQL loads without a token")
+    @DisplayName("GraphiQL loads without a token, with an example query and the token read from the URL fragment")
     void graphiqlIsPublic() {
         ResponseEntity<String> redirect = api.get("/graphiql", null);
         assertThat(redirect.getStatusCode()).isEqualTo(HttpStatus.TEMPORARY_REDIRECT);
@@ -193,6 +193,9 @@ class GraphQlIT {
 
         ResponseEntity<String> page = api.get(location, null);
         assertThat(page.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(page.getBody()).containsIgnoringCase("graphiql");
+        assertThat(page.getBody())
+                .containsIgnoringCase("graphiql")
+                .contains("people(name: \"skywalker\")")
+                .contains("fragment.get(\"token\")");
     }
 }
