@@ -322,7 +322,7 @@ Provisionadas en Prometheus desde [`monitoring/alerts.yml`](monitoring/alerts.ym
 |---|---|
 | `SwapiCircuitOpen` | El circuito de SWAPI está abierto hace más de 1 min |
 | `HighServerErrorRate` | Más de 5% de respuestas 5xx en 5 min |
-| `FailedLoginSpike` | Más de 20 logins fallidos en 5 min |
+| `FailedLoginSpike` | Más de 20 logins fallidos o bloqueados por rate limiting en 5 min |
 
 ![Alertas en Prometheus con FailedLoginSpike disparada](docs/images/prometheus-alerts.png)
 
@@ -336,7 +336,7 @@ La captura es del stack local después de una ráfaga de logins con contraseña 
 | `catalog.entity.views` | Counter | `resource`, `entity` | ¿Qué entidades son las más consultadas? |
 | `catalog.searches.empty` | Counter | `resource` | ¿Qué porcentaje de búsquedas no encuentra nada? |
 | `catalog.page.requested` | DistributionSummary | `resource` | ¿Hasta qué página navegan? |
-| `auth.login.attempts` | Counter | `result` (`success`, `failure`) | ¿Hay intentos de fuerza bruta? |
+| `auth.login.attempts` | Counter | `result` (`success`, `failure`, `blocked`) | ¿Hay intentos de fuerza bruta? |
 | `auth.active.users` | Gauge | — | ¿Cuántos usuarios distintos hubo en 15 min? |
 
 Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics` y `AuthMetrics`; los controllers no conocen Micrometer.

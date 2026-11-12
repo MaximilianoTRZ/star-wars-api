@@ -21,9 +21,9 @@ groups:
           summary: More than 5% of API responses are 5xx
 
       - alert: FailedLoginSpike
-        expr: sum(increase(auth_login_attempts_total{result="failure"}[5m])) > 20
+        expr: sum(increase(auth_login_attempts_total{result=~"failure|blocked"}[5m])) > 20
         labels:
           severity: warning
         annotations:
-          summary: More than 20 failed logins in 5 minutes
+          summary: More than 20 failed or rate-limited logins in 5 minutes
           description: Possible brute-force attempt against the login endpoint.
