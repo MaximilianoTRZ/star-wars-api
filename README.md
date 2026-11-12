@@ -401,10 +401,15 @@ Todas son de solo lectura (`readOnlyHint`). Un ID inexistente devuelve un mensaj
 BASE=https://star-wars-api-ailb.onrender.com   # o http://localhost:8080 (usuario demo / demo123)
 TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/json' \
   -d '{"username":"demo","password":"6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq"}' | jq -r .accessToken)
+claude mcp remove star-wars 2>/dev/null   # por si ya estaba registrado con un token viejo
 claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"
+claude mcp list                            # star-wars tiene que figurar como conectado
 ```
 
-Después, en Claude Code, se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+- En Render, abrir antes https://star-wars-api-ailb.onrender.com/livez: si la instancia estaba dormida, tarda unos 3 minutos y medio en arrancar.
+- Si `TOKEN` queda vacío, el login falló: la instancia todavía está arrancando o se pasó el límite de 5 logins por minuto. Esperar un minuto y repetir.
+
+Después, en Claude Code (`claude`), se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools, y cada llamada a una tool aparece en la conversación.
 
 **Preguntas de ejemplo y las tools que usa el modelo para responderlas.** Las búsquedas devuelven solo `id` y nombre, así que para cualquier atributo el modelo encadena una búsqueda con un `get_*`:
 
