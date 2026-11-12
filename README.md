@@ -12,6 +12,11 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 
 ## Demo
 
+- **URL:** https://star-wars-api-ailb.onrender.com
+- **Health:** https://star-wars-api-ailb.onrender.com/actuator/health
+
+Corre en el plan gratuito de Render, que duerme la instancia después de un rato sin tráfico: el primer request puede tardar entre 30 y 60 s.
+
 ## Quick start
 
 ### Con Docker
