@@ -124,19 +124,35 @@ public class SwapiRestClient implements SwapiClient {
         } catch (RestClientResponseException e) {
             HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
             if (e.getStatusCode().is5xxServerError() || status == HttpStatus.TOO_MANY_REQUESTS) {
-                log.warn("SWAPI answered {} for {}", e.getStatusCode().value(), type.path());
                 Reason reason = status == HttpStatus.TOO_MANY_REQUESTS ? Reason.RATE_LIMITED : Reason.SERVER_ERROR;
+                logAttemptFailed(
+                        type, reason, "SWAPI answered " + e.getStatusCode().value());
                 throw new UpstreamUnavailableException(
                         "SWAPI answered " + e.getStatusCode().value(), reason, retryAfter(e.getResponseHeaders()), e);
             }
             throw new SwapiClientException("SWAPI answered " + e.getStatusCode().value(), e);
         } catch (ResourceAccessException e) {
-            log.warn("SWAPI did not respond for {}: {}", type.path(), e.getMessage());
             Reason reason = isReadTimeout(e) ? Reason.TIMEOUT : Reason.CONNECTION;
+            logAttemptFailed(type, reason, e.getMessage());
             throw new UpstreamUnavailableException("SWAPI did not respond in time", reason, null, e);
         } catch (RestClientException e) {
             throw new SwapiClientException("Could not read the SWAPI response", e);
         }
+    }
+
+    /**
+     * One failed attempt, at {@code DEBUG}: whether it is retried or ends the call is logged once by
+     * {@link SwapiResilienceLogging}.
+     */
+    private static void logAttemptFailed(ResourceType type, Reason reason, String detail) {
+        log.atDebug()
+                .setMessage("SWAPI attempt failed for {} ({}): {}")
+                .addArgument(type.path())
+                .addArgument(reason)
+                .addArgument(detail)
+                .addKeyValue("swapi.resource", type.path())
+                .addKeyValue("swapi.reason", reason.name())
+                .log();
     }
 
     /** A connect timeout is a connection error; only a timeout waiting for the response counts as TIMEOUT. */
