@@ -74,11 +74,25 @@ springdoc:
     persist-authorization: true
 
 management:
+  server:
+    # Actuator lives on its own port, which is never published (only the compose network reaches it).
+    port: 8081
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+        # Also serves /livez and /readyz on the main port, for the platform health check.
+        add-additional-paths: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+      slo:
+        http.server.requests: 100ms,300ms,1s

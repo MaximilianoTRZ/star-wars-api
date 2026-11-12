@@ -1,7 +1,9 @@
 package dev.starwars.auth.security;
 
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -20,8 +22,9 @@ import org.springframework.security.web.SecurityFilterChain;
  * API security filter chain (ADR-004).
  *
  * <ul>
- *   <li><b>Deny by default:</b> only login, the OpenAPI docs and the health and info endpoints are public;
- *       any other route is rejected.</li>
+ *   <li><b>Deny by default:</b> only login, the OpenAPI docs and the {@code /livez} and {@code /readyz} probes
+ *       are public; any other route is rejected.</li>
+ *   <li><b>Actuator:</b> its own chain, on a management port that is never published.</li>
  *   <li><b>Authorization:</b> {@code /api/v1/**} requires the {@code SCOPE_catalog:read} authority, taken
  *       from the JWT {@code scope} claim. Being authenticated is not enough.</li>
  *   <li><b>Stateless:</b> no HTTP session. CSRF is disabled because there are no cookies: the token travels
@@ -36,7 +39,24 @@ public class SecurityConfig {
     /** Scope issued by login and required by the catalog endpoints. */
     public static final String CATALOG_READ_SCOPE = "catalog:read";
 
+    /**
+     * Actuator endpoints. They live on a management port that is never published, so they are open.
+     */
     @Bean
+    @Order(1)
+    SecurityFilterChain managementFilterChain(HttpSecurity http) {
+        http.securityMatcher(EndpointRequest.toAnyEndpoint())
+                .csrf(AbstractHttpConfigurer::disable) // NOSONAR java:S4502 - no cookies, see the API chain
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
@@ -52,7 +72,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
                         .permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
+                        .requestMatchers("/livez", "/readyz")
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()

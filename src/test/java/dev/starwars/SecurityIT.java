@@ -72,10 +72,10 @@ class SecurityIT {
     }
 
     @Test
-    @DisplayName("health, info and OpenAPI docs are public")
+    @DisplayName("probes and OpenAPI docs are public")
     void publicRoutes() {
-        assertThat(api.get("/actuator/health", null).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(api.get("/actuator/info", null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(api.get("/livez", null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(api.get("/readyz", null).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(api.get("/v3/api-docs", null).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(api.get("/swagger-ui/index.html", null).getStatusCode()).isEqualTo(HttpStatus.OK);
     }

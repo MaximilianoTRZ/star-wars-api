@@ -1450,18 +1450,17 @@
           ]
         },
         {
-          "name": "Health check is public",
+          "name": "Liveness probe is public",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/actuator/health",
+              "raw": "{{baseUrl}}/livez",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "actuator",
-                "health"
+                "livez"
               ]
             },
             "auth": {
