@@ -170,7 +170,7 @@ El campo `type` identifica el problema. Los de la API son:
 
 | Status | `type` | Cuándo |
 |---|---|---|
-| 400 | `/problems/validation-error` | Parámetros o body inválidos; incluye `errors: [{field, message}]` |
+| 400 | `/problems/validation-error` | Un parámetro o un campo del body no cumple las validaciones (`size` > 100, `id` no numérico, `password` vacía); incluye `errors: [{field, message}]` |
 | 401 | `/problems/unauthorized` | Falta el token, es inválido o está vencido; incluye `WWW-Authenticate: Bearer` |
 | 401 | `/problems/invalid-credentials` | Login con usuario o contraseña incorrectos (mismo mensaje en ambos casos) |
 | 403 | `/problems/forbidden` | El token no tiene el scope `catalog:read` |
