@@ -22,7 +22,7 @@
         <!-- Base JVM args for test forks; the JaCoCo agent is appended to it -->
         <argLine/>
         <archunit.version>1.5.1</archunit.version>
-        <springdoc.version>3.1.0</springdoc.version>
+        <springdoc.version>3.1.1</springdoc.version>
         <!-- resilience4j-spring-boot4 is not in the 2.4.0 BOM: explicit version -->
         <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
