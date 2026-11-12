@@ -15,6 +15,12 @@ app:
     connect-timeout: 2s
     # SWAPI takes 2 to 9 s per request from Render
     read-timeout: 10s
+  security:
+    jwt:
+      # Local development default only. The prod profile requires JWT_SECRET.
+      secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789}
+      issuer: star-wars-api
+      ttl: 1h
 
 management:
   endpoints:

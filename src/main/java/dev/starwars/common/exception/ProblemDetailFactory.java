@@ -3,6 +3,8 @@ package dev.starwars.common.exception;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
@@ -10,7 +12,9 @@ import org.springframework.stereotype.Component;
 /**
  * Builds API errors as {@link ProblemDetail} (RFC 9457), always with a {@code timestamp}.
  *
- * <p>The only place where an error body is created, so every error has the same shape.
+ * <p>The only place where an error body is created, so every error has the same shape. Used by
+ * {@link GlobalExceptionHandler} and by the 401/403 handlers of the security filter chain, which do not go
+ * through the {@code @RestControllerAdvice}.
  */
 @Component
 public class ProblemDetailFactory {
@@ -40,5 +44,26 @@ public class ProblemDetailFactory {
             problem.setProperty("timestamp", Instant.now(clock).toString());
         }
         return problem;
+    }
+
+    /**
+     * JSON shape of the problem, with extra properties at the same level as the standard fields. Used where
+     * the response is written by hand, outside Spring MVC message converters.
+     */
+    public Map<String, Object> toMap(ProblemDetail problem) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put(
+                "type",
+                problem.getType() == null ? "about:blank" : problem.getType().toString());
+        body.put("title", problem.getTitle());
+        body.put("status", problem.getStatus());
+        body.put("detail", problem.getDetail());
+        if (problem.getInstance() != null) {
+            body.put("instance", problem.getInstance().toString());
+        }
+        if (problem.getProperties() != null) {
+            body.putAll(problem.getProperties());
+        }
+        return body;
     }
 }
