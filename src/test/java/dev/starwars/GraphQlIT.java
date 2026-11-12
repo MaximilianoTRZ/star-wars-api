@@ -13,6 +13,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.ApiClient;
 import dev.starwars.support.Fixtures;
+import dev.starwars.support.Logs;
 import dev.starwars.support.TestTokens;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -124,9 +125,8 @@ class GraphQlIT {
                 .isEqualTo("/problems/upstream-unavailable");
         assertThat(JsonPath.<String>read(down.getBody(), "$.errors[0].extensions.requestId"))
                 .isEqualTo(downId);
-        assertThat(output)
-                .containsPattern("\\[" + downId + "] .*SWAPI attempt 1/3 failed")
-                .containsPattern("\\[" + downId + "] .*POST /graphql 200");
+        assertThat(output).containsPattern("\\[" + downId + "] .*SWAPI attempt 1/3 failed");
+        Logs.awaitPattern(output, "\\[" + downId + "] .*POST /graphql 200");
     }
 
     @Test

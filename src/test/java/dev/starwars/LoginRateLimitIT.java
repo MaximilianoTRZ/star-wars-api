@@ -3,6 +3,7 @@ package dev.starwars;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jayway.jsonpath.JsonPath;
+import dev.starwars.support.Logs;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -76,9 +77,8 @@ class LoginRateLimitIT {
                         .counter()
                         .count())
                 .isEqualTo(blockedBefore + 1);
-        assertThat(output)
-                .containsPattern("WARN.*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s")
-                .containsPattern("INFO.*POST /api/v1/auth/login 429");
+        assertThat(output).containsPattern("WARN.*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s");
+        Logs.awaitPattern(output, "INFO.*POST /api/v1/auth/login 429");
     }
 
     @Test
