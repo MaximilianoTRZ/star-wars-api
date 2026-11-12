@@ -305,11 +305,11 @@ No hay código de dominio todavía. Lo que se deja preparado es el marco que sos
 
 ### Salida de la fase
 
-- [ ] URL pública respondiendo
-- [ ] CI y quality gate en verde, con badges
-- [ ] Spotless, JaCoCo `check` y ArchUnit corriendo en `verify`
-- [ ] `main` protegido y Dependabot activo
-- [ ] Tag `v0.1.0`
+- [x] URL pública respondiendo
+- [x] CI y quality gate en verde, con badges
+- [x] Spotless, JaCoCo `check` y ArchUnit corriendo en `verify`
+- [x] `main` protegido y Dependabot activo
+- [x] Tag `v0.1.0`
 
 ## 5. Fase 1 — MVP (~7 h, tag `v1.0.0`)
 
@@ -492,10 +492,10 @@ Un único formato de error para toda la API, incluidos los 401 y 403 de la caden
 
 ### Salida de la fase
 
-- [ ] Todos los requisitos verificados contra la URL pública
-- [ ] CI y quality gate en verde
-- [ ] README completo y Swagger UI funcionando con Authorize, sin errores de schema
-- [ ] Tag `v1.0.0`
+- [x] Todos los requisitos verificados contra la URL pública
+- [x] CI y quality gate en verde
+- [x] README completo y Swagger UI funcionando con Authorize, sin errores de schema
+- [x] Tag `v1.0.0`
 
 ## 6. Fase 2 — Resiliencia y caché (~2 h, tag `v1.1.0`)
 
