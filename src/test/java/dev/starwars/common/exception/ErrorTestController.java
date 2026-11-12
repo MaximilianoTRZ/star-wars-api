@@ -5,6 +5,9 @@ import dev.starwars.catalog.domain.ResourceNotFoundException;
 import dev.starwars.swapi.SwapiClientException;
 import dev.starwars.swapi.UpstreamUnavailableException;
 import dev.starwars.swapi.UpstreamUnavailableException.Reason;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
@@ -41,6 +44,12 @@ class ErrorTestController {
     @GetMapping("/upstream-down")
     void upstreamDown() {
         throw new UpstreamUnavailableException("SWAPI answered 500", Reason.SERVER_ERROR, null, null);
+    }
+
+    @GetMapping("/circuit-open")
+    void circuitOpen() {
+        throw CallNotPermittedException.createCallNotPermittedException(
+                CircuitBreaker.of("swapi", CircuitBreakerConfig.ofDefaults()));
     }
 
     @GetMapping("/unexpected")

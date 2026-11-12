@@ -10,11 +10,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import dev.starwars.config.ClockConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,6 +74,15 @@ class GlobalExceptionHandlerTest {
 
         assertProblem(result, 503, "upstream-unavailable", "/test/errors/upstream-down");
         result.andExpect(header().doesNotExist("Retry-After"));
+    }
+
+    @Test
+    @DisplayName("an open circuit is 503 with the open-state wait as Retry-After")
+    void circuitOpen() throws Exception {
+        var result = mvc.perform(get("/test/errors/circuit-open"));
+
+        assertProblem(result, 503, "upstream-unavailable", "/test/errors/circuit-open");
+        result.andExpect(header().string("Retry-After", "60"));
     }
 
     @Test
@@ -141,5 +153,17 @@ class GlobalExceptionHandlerTest {
     @DisplayName("an unsupported method is 405 from Spring MVC")
     void methodNotAllowed() throws Exception {
         assertProblem(mvc.perform(post("/test/errors/not-found")), 405, ABOUT_BLANK, "/test/errors/not-found");
+    }
+
+    /**
+     * Registry with the Resilience4j defaults (60 s open-state wait), as the slice has no autoconfiguration.
+     * Nested test configurations are picked up automatically.
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class CircuitBreakerRegistryConfig {
+        @Bean
+        CircuitBreakerRegistry circuitBreakerRegistry() {
+            return CircuitBreakerRegistry.ofDefaults();
+        }
     }
 }

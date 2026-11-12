@@ -242,6 +242,26 @@ class SwapiResilienceIT {
     }
 
     @Test
+    @DisplayName("circuit breaker: repeated failures open the circuit and SWAPI is no longer called")
+    void opensAfterRepeatedFailures() {
+        swapi.stubFor(
+                get(urlPathMatching("/api/people/.*")).willReturn(aResponse().withStatus(500)));
+
+        for (int i = 1; i <= 5 && circuitBreaker().getState() != CircuitBreaker.State.OPEN; i++) {
+            assertThat(call("/api/v1/people/" + i).getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        assertThat(circuitBreaker().getState()).isEqualTo(CircuitBreaker.State.OPEN);
+        int requestsBefore = swapi.getAllServeEvents().size();
+
+        ResponseEntity<String> response = call("/api/v1/people/42");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(JsonPath.<String>read(response.getBody(), "$.type")).isEqualTo("/problems/upstream-unavailable");
+        assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("30");
+        assertThat(swapi.getAllServeEvents()).hasSize(requestsBefore);
+    }
+
+    @Test
     @DisplayName("circuit breaker: a 4xx does not count as a failure")
     void clientErrorsDoNotOpen() {
         swapi.stubFor(
