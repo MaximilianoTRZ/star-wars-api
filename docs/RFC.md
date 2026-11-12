@@ -797,23 +797,36 @@ Objetivo: que clientes de IA (Claude, Cursor) consulten el catálogo a través d
 
 - Mismo jar, misma imagen Docker y mismo servicio de Render. Solo aparece `/mcp` en el mismo puerto. No hay infraestructura ni variables de entorno nuevas.
 - El servidor MCP no llama a ningún modelo: solo expone tools, y el modelo lo pone el cliente. No hace falta API key.
-- Al cerrar la fase se vuelven a medir el tiempo de arranque y la memoria, y se actualizan en el README.
+- Al cerrar la fase se revisa en Render el tiempo de arranque (167 s con GraphQL).
 
-### WU 6.1 — Servidor MCP
+### WU 6.1 — Servidor y tools
 
-- Spring AI 2.x (compatible con Boot 4) con el starter de servidor MCP para WebMVC; el nombre exacto del artefacto se confirma en Initializr.
-- Transporte HTTP streamable en `/mcp`.
-- Una tool por operación, con `@McpTool` y parámetros documentados: `search_people`, `get_person`, `search_films`, `get_film`, `search_starships`, `get_starship`, `search_vehicles`, `get_vehicle`. Todas delegan en `CatalogService`.
-- Seguridad: el mismo JWT y el scope `catalog:read`.
-- Un ID inexistente devuelve un resultado de tool con un mensaje claro, no un error de protocolo.
-- Métricas: `catalog.queries{channel="mcp"}`.
-- **Tests:** un IT que levanta un cliente MCP, lista las tools y llama a `search_people` con SWAPI simulada por WireMock; sin token → 401.
-- README: sección "Usalo desde Claude" con la configuración para Claude Code (`claude mcp add --transport http ... --header "Authorization: Bearer <token>"`) y Claude Desktop, y qué hacer cuando el token vence.
+- Spring AI 2.0.2 (compilado contra Boot 4.1.2) con `spring-ai-starter-mcp-server-webmvc`.
+- Transporte Streamable HTTP **stateless** en `/mcp` (`spring.ai.mcp.server.protocol: STATELESS`, ADR-019): sin sesión en memoria, cualquier réplica atiende cualquier llamada, y responde JSON plano.
+- `CatalogMcpTools`: una tool por operación, con `@McpTool` de solo lectura y parámetros documentados para el modelo: `search_people`, `get_person`, `search_films`, `get_film`, `search_starships`, `get_starship`, `search_vehicles`, `get_vehicle`. Todas delegan en `CatalogService` y devuelven los mismos DTOs que REST como JSON.
+- Cada tool arma su `CallToolResult`. Un ID inexistente es un resultado normal con un mensaje claro y una entrada inválida es `isError` con un mensaje claro. El SDK, si una tool lanza una excepción, devuelve su mensaje interno; por eso las tools no lo dejan pasar.
+- Seguridad: el mismo JWT y el scope `catalog:read`; sin token, 401 `ProblemDetail` antes de llegar a MCP.
+- ArchUnit: `mcp` no usa `swapi`, repositorios ni `graphql`; `api` y `service` no dependen de `mcp`.
+- **Tests:** unitarios de las tools con `CatalogService` mockeado; `McpIT` con el cliente del MCP SDK (`McpSyncClient` sobre Streamable HTTP), que lista las 8 tools y llama a `search_people` y `get_person` con SWAPI simulada por WireMock; sin token → 401 y sin scope → 403.
+
+### WU 6.2 — Errores, correlación y métricas
+
+- Errores de SWAPI → `isError` con el mismo texto público que el `detail` de REST. `catalog/mcp` declara la interfaz `ToolErrorMessages` y la implementación vive en `common/exception`, al lado de los handlers de REST y GraphQL, así las tools no conocen las excepciones de `swapi` (inversión de dependencias, sin ciclo entre paquetes).
+- `CatalogChannel` suma `MCP`. `CatalogChannelFilter` reemplaza al filtro solo de GraphQL y mapea `/graphql` y `/mcp` a su canal: `catalog.queries{channel="mcp"}`.
+- El servidor stateless sync ejecuta las tools en el thread del request, así que el `requestId`, el usuario y el canal llegan sin configuración extra.
+- **Tests:** IT con SWAPI devolviendo 500 → `isError` con el mensaje público; el canal `mcp` en la métrica y el `requestId` del header en los logs de reintentos y de acceso.
+
+### WU 6.3 — Documentación, Postman y demo
+
+- README: sección "MCP" (Claude Code, Claude Desktop con `mcp-remote`, curl de JSON-RPC, qué hacer cuando vence el token) y entrada en "Probarlo en Render".
+- Postman: carpeta "MCP" con JSON-RPC sobre `/mcp`. `docs/api-examples.http` con `tools/list` y `tools/call`.
+- ADR-019: MCP stateless con el JWT en un header.
 
 ### SOLID en esta fase
 
 - **O:** un canal nuevo sin modificar `CatalogService`, `SwapiClient`, los controllers REST ni los resolvers GraphQL.
-- **S:** las tools solo traducen entre MCP y `CatalogService`.
+- **S:** las tools solo traducen entre MCP y `CatalogService`; los mensajes de error públicos viven en `PublicToolErrorMessages` y el canal en `CatalogChannelFilter`.
+- **D:** las tools dependen de la abstracción `ToolErrorMessages`, no de su implementación ni de las excepciones de SWAPI.
 - **D:** los tres adaptadores dependen del mismo servicio de aplicación, no de SWAPI ni entre ellos.
 
 ### Cierre de la fase
@@ -826,7 +839,7 @@ Objetivo: que clientes de IA (Claude, Cursor) consulten el catálogo a través d
 - [ ] `/mcp` funcionando en la URL de Render, protegido con JWT
 - [ ] Tests del adaptador MCP en verde
 - [ ] Probado desde Claude Code contra Render
-- [ ] Tiempo de arranque y memoria actualizados en el README
+- [ ] Arranque revisado en Render
 - [ ] Tag `v1.5.0`
 
 ## 11. Decisiones, riesgos y fuentes
@@ -855,6 +868,7 @@ Cada decisión tiene su archivo en [`docs/adr/`](adr/).
 | [016](adr/ADR-016.md) | GraphQL y MCP como adaptadores del mismo `CatalogService`, en el mismo deploy | Un servicio por protocolo; un gateway GraphQL aparte | Sin lógica duplicada, un deploy y una configuración de seguridad |
 | [017](adr/ADR-017.md) | Swagger UI y GraphiQL públicos en prod; los datos siguen detrás del JWT | Interfaces solo en local | El reviewer prueba REST y GraphQL desde el navegador, sin instalar nada |
 | [018](adr/ADR-018.md) | Logging de producción: un evento por decisión, línea de acceso, key-values en ECS | Loki; access log de Tomcat; `WARN` por intento; `/actuator/loggers` en prod | Diagnosticar desde la consola de Render filtrando por `requestId`, sin infraestructura nueva |
+| [019](adr/ADR-019.md) | Servidor MCP stateless con el JWT en un header | Streamable HTTP con sesión; OAuth 2.1 del spec MCP; servicio MCP aparte | Sin estado por cliente, mismo JWT que REST y GraphQL, se prueba con curl |
 
 ### Riesgos
 
