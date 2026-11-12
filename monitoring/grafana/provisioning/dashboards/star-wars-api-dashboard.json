@@ -713,7 +713,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (resource) (increase(catalog_searches_empty_total[$__range])) / clamp_min(sum by (resource) (increase(catalog_queries_total{filter=~\"name|id_and_name\"}[$__range])), 1)",
+          "expr": "(sum by (resource) (increase(catalog_searches_empty_total[$__range])) or sum by (resource) (increase(catalog_queries_total{filter=~\"name|id_and_name\"}[$__range])) * 0) / clamp_min(sum by (resource) (increase(catalog_queries_total{filter=~\"name|id_and_name\"}[$__range])), 1)",
           "refId": "A",
           "legendFormat": "{{resource}}"
         }
