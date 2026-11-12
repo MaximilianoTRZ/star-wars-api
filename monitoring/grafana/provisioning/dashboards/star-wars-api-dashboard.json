@@ -509,6 +509,250 @@
     },
     {
       "type": "row",
+      "id": 32,
+      "title": "Alerts",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "id": 33,
+      "title": "SwapiCircuitOpen",
+      "description": "Same condition as the SwapiCircuitOpen rule in monitoring/alerts.yml: the SWAPI circuit breaker is open. Shows the current state; Prometheus also waits 1 minute before firing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(resilience4j_circuitbreaker_state{name=\"swapi\", state=\"open\"}) == bool 1",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "OK",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "FIRING",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "id": 34,
+      "title": "HighServerErrorRate",
+      "description": "Same condition as the HighServerErrorRate rule in monitoring/alerts.yml: more than 5% of API responses are 5xx over 5 minutes. Shows the current state; Prometheus also waits 5 minutes before firing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or vector(0)) / sum(rate(http_server_requests_seconds_count[5m])) > bool 0.05",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "OK",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "FIRING",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "id": 35,
+      "title": "FailedLoginSpike",
+      "description": "Same condition as the FailedLoginSpike rule in monitoring/alerts.yml: more than 20 failed or rate-limited logins in 5 minutes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(increase(auth_login_attempts_total{result=~\"failure|blocked\"}[5m])) or vector(0)) > bool 20",
+          "refId": "A",
+          "legendFormat": "__auto",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "OK",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OK",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "FIRING",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
       "id": 9,
       "title": "Business",
       "collapsed": false,
@@ -516,7 +760,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 10
       },
       "panels": []
     },
@@ -533,7 +777,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 6
+        "y": 11
       },
       "targets": [
         {
@@ -588,7 +832,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 6
+        "y": 11
       },
       "targets": [
         {
@@ -643,7 +887,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 6
+        "y": 11
       },
       "targets": [
         {
@@ -705,7 +949,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 14
+        "y": 19
       },
       "targets": [
         {
@@ -762,7 +1006,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 14
+        "y": 19
       },
       "targets": [
         {
@@ -826,7 +1070,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 14
+        "y": 19
       },
       "targets": [
         {
@@ -877,7 +1121,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 27
       },
       "panels": []
     },
@@ -894,7 +1138,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 23
+        "y": 28
       },
       "targets": [
         {
@@ -949,7 +1193,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 23
+        "y": 28
       },
       "targets": [
         {
@@ -1004,7 +1248,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 23
+        "y": 28
       },
       "targets": [
         {
@@ -1077,7 +1321,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 36
       },
       "targets": [
         {
@@ -1128,7 +1372,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 44
       },
       "panels": []
     },
@@ -1145,7 +1389,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 40
+        "y": 45
       },
       "targets": [
         {
@@ -1209,7 +1453,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 40
+        "y": 45
       },
       "targets": [
         {
@@ -1264,7 +1508,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 40
+        "y": 45
       },
       "targets": [
         {
@@ -1319,7 +1563,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 48
+        "y": 53
       },
       "targets": [
         {
@@ -1374,7 +1618,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 48
+        "y": 53
       },
       "targets": [
         {
@@ -1438,7 +1682,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 48
+        "y": 53
       },
       "targets": [
         {
@@ -1500,7 +1744,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 61
       },
       "panels": []
     },
@@ -1517,7 +1761,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 57
+        "y": 62
       },
       "targets": [
         {
@@ -1590,7 +1834,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 57
+        "y": 62
       },
       "targets": [
         {
@@ -1645,7 +1889,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 57
+        "y": 62
       },
       "targets": [
         {
