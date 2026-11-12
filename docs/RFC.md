@@ -20,6 +20,38 @@ La Fase 1 cumple todos los requisitos funcionales y es entregable por sí sola. 
 | 6 | Tests unitarios y de integración | JUnit 5, Mockito, AssertJ, MockMvc, WireMock; JaCoCo con umbral | F0–F1 |
 | 7 | Despliegue | Docker multi-stage + Render, desplegado desde la Fase 0 | F0 |
 
+### Features
+
+**MVP: lo que pide el challenge (Fase 1, `v1.0.0`).** Es lo que hay que revisar para validar el challenge.
+
+- **Catálogo de SWAPI:** People, Films, Starships y Vehicles, con listado (`GET /api/v1/{recurso}`) y detalle (`GET /api/v1/{recurso}/{id}`).
+- **Paginación uniforme:** `page` y `size` (1 a 100) iguales para los 4 recursos, aunque SWAPI no pagine films ni búsquedas. Una página fuera de rango vuelve vacía, con los totales reales.
+- **Filtros por ID y/o nombre** (por título en films): búsqueda "contiene" sin distinguir mayúsculas, y combinación de los dos filtros.
+- **Login seguro:** `POST /api/v1/auth/login` con usuarios en H2 y contraseñas en BCrypt; emite un JWT HS256 que dura 1 hora.
+- **Autenticación y autorización:** el catálogo exige el JWT con el scope `catalog:read`; cualquier otra ruta se rechaza (deny by default).
+- **Errores uniformes** con Problem Details (RFC 9457), incluidos 401 y 403.
+- **Documentación:** README, Swagger UI / OpenAPI, Javadoc, RFC y ADRs.
+- **Tests unitarios y de integración**, con SWAPI simulada con WireMock sobre respuestas reales.
+- **Despliegue** en Render con Docker; colección de Postman y archivo `.http` para probarla.
+
+**Sumado después (Fases 0 y 2 a 6),** como buenas prácticas para una API en producción, sin cambiar el contrato del MVP:
+
+- **Calidad desde el primer commit (Fase 0):** CI en GitHub Actions, quality gate de SonarCloud, cobertura mínima de 80% con JaCoCo, reglas de arquitectura con ArchUnit, formato con Spotless y Dependabot.
+- **Resiliencia (Fase 2):** caché de SWAPI con Caffeine (1 hora), retry con backoff que respeta el `Retry-After` de SWAPI y circuit breaker que responde 503 al instante cuando SWAPI está caída.
+- **Observabilidad (Fase 3):**
+  - Métricas técnicas y de negocio con Micrometer y Prometheus.
+  - Correlation ID (`X-Request-Id`) en logs, headers y errores.
+  - Prometheus, Grafana y alertas como código, con `docker compose up`.
+  - Dashboard público en Grafana Cloud con datos de Render, incluida una fila con el estado de las alertas.
+- **Seguridad y operación (Fase 4):**
+  - Rate limiting del login: 5 intentos por minuto por IP, tomando la IP real de Cloudflare.
+  - Logs de producción en JSON (ECS).
+  - Fail fast si faltan secretos en `prod`.
+  - Notas de escalabilidad.
+- **GraphQL (Fase 5):** `/graphql` sobre el mismo servicio y con el mismo JWT; GraphiQL público con la query y el token precargados; errores con el mismo `type` que REST; límite de 5 campos raíz por query.
+- **MCP (Fase 6):** servidor MCP stateless en `/mcp` con 8 tools de solo lectura, para consultar el catálogo desde Claude Code, Claude Desktop o Cursor con el mismo JWT.
+- **Demo fácil de probar:** Swagger UI con las credenciales demo precargadas y autorizado al hacer login, comandos de una línea para Render y Postman con el token automático.
+
 ### No-objetivos
 
 - Microservicios: ver ADR-001.

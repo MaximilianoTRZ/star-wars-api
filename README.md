@@ -46,6 +46,40 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 6 | Tests unitarios y de integración | 245 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
 | 7 | Despliegue | Docker multi-stage en Render, con deploy automático desde `main` |
 
+## Features
+
+### MVP: lo que pide el challenge (Fase 1, `v1.0.0`)
+
+Para una revisión acotada alcanza con esta parte: cubre los 7 requisitos de la tabla de arriba.
+
+- **Catálogo de SWAPI:** People, Films, Starships y Vehicles, con listado (`GET /api/v1/{recurso}`) y detalle (`GET /api/v1/{recurso}/{id}`).
+- **Paginación uniforme:** `page` y `size` (1 a 100) iguales para los 4 recursos, aunque SWAPI no pagine films ni búsquedas. Una página fuera de rango vuelve vacía, con los totales reales.
+- **Filtros por ID y/o nombre** (por título en films): búsqueda "contiene" sin distinguir mayúsculas, y combinación de los dos filtros.
+- **Login seguro:** `POST /api/v1/auth/login` con usuarios en H2 y contraseñas en BCrypt; emite un JWT HS256 que dura 1 hora.
+- **Autenticación y autorización:** el catálogo exige el JWT con el scope `catalog:read`; cualquier otra ruta se rechaza (deny by default).
+- **Errores uniformes** con Problem Details (RFC 9457), incluidos 401 y 403.
+- **Documentación:** README, Swagger UI / OpenAPI, Javadoc, RFC y ADRs.
+- **Tests unitarios y de integración**, con SWAPI simulada con WireMock sobre respuestas reales.
+- **Despliegue** en Render con Docker; colección de Postman y archivo `.http` para probarla.
+
+### Sumado después, por decisión propia (Fases 0 y 2 a 6)
+
+- **Calidad desde el primer commit (Fase 0):** CI en GitHub Actions, quality gate de SonarCloud, cobertura mínima de 80% con JaCoCo, reglas de arquitectura con ArchUnit, formato con Spotless y Dependabot.
+- **Resiliencia (Fase 2):** caché de SWAPI con Caffeine (1 hora), retry con backoff que respeta el `Retry-After` de SWAPI y circuit breaker que responde 503 al instante cuando SWAPI está caída.
+- **Observabilidad (Fase 3):**
+  - Métricas técnicas y de negocio con Micrometer y Prometheus.
+  - Correlation ID (`X-Request-Id`) en logs, headers y errores.
+  - Prometheus, Grafana y alertas como código, con `docker compose up`.
+  - Dashboard público en Grafana Cloud con datos de Render, incluida una fila con el estado de las alertas.
+- **Seguridad y operación (Fase 4):**
+  - Rate limiting del login: 5 intentos por minuto por IP, tomando la IP real de Cloudflare.
+  - Logs de producción en JSON (ECS).
+  - Fail fast si faltan secretos en `prod`.
+  - Notas de escalabilidad.
+- **GraphQL (Fase 5):** `/graphql` sobre el mismo servicio y con el mismo JWT; GraphiQL público con la query y el token precargados; errores con el mismo `type` que REST; límite de 5 campos raíz por query.
+- **MCP (Fase 6):** servidor MCP stateless en `/mcp` con 8 tools de solo lectura, para consultar el catálogo desde Claude Code, Claude Desktop o Cursor con el mismo JWT.
+- **Demo fácil de probar:** Swagger UI con las credenciales demo precargadas y autorizado al hacer login, comandos de una línea para Render y Postman con el token automático.
+
 ## Cómo se construyó
 
 **El MVP ([Fase 1, `v1.0.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.0.0)) cumple todos los requisitos del challenge** (la tabla de arriba). A partir de ahí, el alcance se amplió por fases con prácticas que consideré necesarias para que una API así funcione bien en producción: tolerar un proveedor lento y con rate limit, ver qué pasa adentro y endurecer la seguridad, sin cambiar el contrato REST. Cada fase terminó con un release taggeado y desplegado en Render.
@@ -86,7 +120,7 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **REST desde Swagger UI:** abrir `POST /api/v1/auth/login` y apretar **Execute**: el body ya trae el usuario demo del entorno (en Render, la contraseña de arriba; en local, `demo123`) y el `accessToken` de la respuesta se carga solo en **Authorize**. Después se puede llamar a cualquier endpoint del catálogo sin copiar el token; los formularios ya vienen en modo *Try it out*.
 
-**Desde Claude Code (MCP):** con el `TOKEN` del comando de arriba, `claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"` y preguntarle, por ejemplo, "¿qué naves aparecen en A New Hope?". Más detalle en [MCP](#mcp).
+**Desde Claude Code (MCP):** con el `TOKEN` del comando de arriba, `claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"` y preguntarle, por ejemplo, "comparame el Halcón Milenario con la Estrella de la Muerte". Hay más preguntas de ejemplo en [MCP](#mcp).
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST, GraphQL y MCP) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
@@ -354,7 +388,25 @@ TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/js
 claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"
 ```
 
-Después, en Claude Code: "¿qué naves aparecen en A New Hope?" o "comparame el Halcón Milenario con la Estrella de la Muerte". `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+Después, en Claude Code, se le hace cualquiera de las preguntas de abajo. `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+
+**Preguntas de ejemplo y las tools que usa el modelo para responderlas.** Las búsquedas devuelven solo `id` y nombre, así que para cualquier atributo el modelo encadena una búsqueda con un `get_*`:
+
+| Pregunta | Tools que usa |
+|---|---|
+| ¿Quiénes son los Skywalker? | `search_people(name: "skywalker")` |
+| ¿Cuánto mide Darth Vader y de qué color tiene los ojos? | `search_people(name: "vader")` → `get_person(id: "4")` |
+| ¿Quién dirigió El Imperio Contraataca y cuándo se estrenó? | `search_films(title: "empire")` → `get_film(id: "2")` |
+| Mostrame el texto de apertura de A New Hope | `search_films(title: "hope")` → `get_film(id: "1")` |
+| Ordená las películas por número de episodio | `search_films()` → `get_film` por cada una (el episodio está en el detalle) |
+| Comparame el Halcón Milenario con la Estrella de la Muerte: costo, tripulación y hyperdrive | `search_starships(name: "falcon")` y `search_starships(name: "death")` → `get_starship(id: "10")` y `get_starship(id: "9")` |
+| ¿Cuántas naves y cuántos vehículos hay en el catálogo? | `search_starships(size: 1)` y `search_vehicles(size: 1)`, y lee `totalElements` |
+| ¿Qué es el Sand Crawler y cuánto cuesta? | `search_vehicles(name: "sand")` → `get_vehicle(id: "4")` |
+| ¿Quiénes son los Organa? | `search_people(name: "organa")` |
+| Mostrame la página 3 de personajes, de a 5 | `search_people(page: 3, size: 5)` |
+| ¿Existe el personaje con id 9999? | `get_person(id: "9999")`: responde que no existe y sugiere usar las búsquedas |
+
+El catálogo no tiene relaciones entre recursos: el detalle de una película no lista sus personajes ni sus naves, y el de un personaje no dice en qué películas aparece. Preguntas como "¿qué naves aparecen en A New Hope?" no se pueden responder con estas tools.
 
 **Desde Claude Desktop:** los conectores remotos de Claude Desktop no permiten agregar headers, así que se usa el proxy [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) en `claude_desktop_config.json`, reemplazando `<token>`:
 
