@@ -69,7 +69,7 @@ Aplican a todas las fases. Cada fase tiene una subsección "SOLID en esta fase" 
 | Principio | Cómo se aplica en el proyecto |
 | --- | --- |
 | **S** — Responsabilidad única | Cada clase tiene un motivo para cambiar: los controllers solo traducen HTTP, `CatalogService` orquesta, `Paginator` pagina, `ProblemDetailFactory` arma errores, `TokenService` emite tokens. Las preocupaciones transversales (caché, resiliencia, métricas, correlación) viven en su propio componente |
-| **O** — Abierto/cerrado | El comportamiento se extiende sin modificar lo existente: caché y resiliencia como decorators de `SwapiClient`, un recurso nuevo como un valor de `ResourceType`, un canal nuevo (GraphQL, MCP) como un adaptador sobre `CatalogService` |
+| **O** — Abierto/cerrado | El comportamiento se extiende sin modificar lo existente: caché y resiliencia como decorators de `SwapiClient`, un recurso nuevo como un valor de `ResourceType` y de `CatalogResource`, un canal nuevo (GraphQL, MCP) como un adaptador sobre `CatalogService` |
 | **L** — Sustitución de Liskov | Toda implementación de `SwapiClient` (HTTP, caché, resiliencia) respeta el mismo contrato: 404 → `Optional.empty()`, mismas excepciones. Los tests del contrato aplican a cualquiera de ellas |
 | **I** — Segregación de interfaces | Interfaces chicas y enfocadas: `SwapiClient` tiene 3 métodos; la documentación OpenAPI común va en `CatalogApi`, separada de la lógica de los controllers |
 | **D** — Inversión de dependencias | Las capas altas dependen de abstracciones: `CatalogService` depende de `SwapiClient`, no de `RestClient`; `TokenService` recibe un `Clock`; las métricas reciben un `MeterRegistry`; la configuración entra por records de propiedades. Todo se inyecta por constructor y se reemplaza en tests |
@@ -384,6 +384,7 @@ Reglas:
 - Una página fuera de rango devuelve `content: []` con los totales reales, no un error.
 - `Paginator` es una clase pura (sin Spring) que corta una lista en memoria y calcula los totales (`totalPages = ceil(total / size)`, 0 si no hay elementos).
 - `CatalogService` traduce `SwapiEntity` a `CatalogItem(id, name, attributes)` de `catalog/domain`. Los controllers nunca ven tipos de `swapi`.
+- El recurso se identifica con `CatalogResource` (enum de `catalog/domain`), no con `ResourceType`: así los controllers no dependen de `swapi`, como exige ArchUnit. `CatalogService` lo traduce a `ResourceType` con un `switch` exhaustivo, que no compila si un recurso queda sin mapear.
 - **Tests unitarios:** `Paginator` (lista vacía, última página parcial, página fuera de rango, size máximo) y `CatalogService` con `SwapiClient` mockeado para cada fila de la tabla.
 
 ### WU 1.3 — Errores con Problem Details
@@ -479,7 +480,7 @@ Un único formato de error para toda la API, incluidos los 401 y 403 de la caden
 ### SOLID en esta fase
 
 - **S:** controllers sin lógica (validan, delegan y mapean al DTO); `CatalogService` orquesta la estrategia; `Paginator` solo pagina; `ProblemDetailFactory` es el único que arma errores; `TokenService` solo emite tokens y `UserAccountDetailsService` solo carga usuarios.
-- **O:** agregar un recurso es un valor nuevo en `ResourceType` más su controller y DTOs, sin tocar la estrategia de resolución. Un error nuevo es un `type` y un mapeo en `GlobalExceptionHandler`.
+- **O:** agregar un recurso es un valor nuevo en `ResourceType` y en `CatalogResource` más su controller y DTOs, sin tocar la estrategia de resolución. Un error nuevo es un `type` y un mapeo en `GlobalExceptionHandler`.
 - **L:** `SwapiRestClient` cumple el contrato de `SwapiClient` documentado en su Javadoc (404 → `Optional.empty()`, excepciones tipadas). Ese contrato es el que respetarán los decorators de la Fase 2.
 - **I:** `SwapiClient` expone solo las 3 operaciones que necesita el catálogo; las anotaciones de OpenAPI viven en `CatalogApi`, no mezcladas con el código de los controllers.
 - **D:** `CatalogService` depende de la interfaz `SwapiClient`; `TokenService` recibe un `Clock`; la configuración entra por `SwapiProperties`, `JwtProperties` y `DemoUserProperties`. Todo por constructor, reemplazable en tests.
