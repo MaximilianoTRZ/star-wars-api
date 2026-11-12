@@ -28,7 +28,7 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 
 Para probar desde Swagger UI: ejecutar `POST /api/v1/auth/login` con el usuario demo, copiar el `accessToken`, pegarlo en **Authorize** y llamar a cualquier endpoint del catálogo.
 
-Corre en el plan gratuito de Render, que duerme la instancia después de un rato sin tráfico: el primer request puede tardar entre 30 y 60 s. Además, SWAPI tarda entre 2 y 9 s por request desde Render.
+Corre en el plan gratuito de Render, que duerme la instancia después de un rato sin tráfico: el primer request puede tardar entre 30 y 60 s. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
 ## Quick start
 
@@ -127,7 +127,7 @@ curl -s "$BASE/api/v1/starships/9" -H "Authorization: Bearer $TOKEN"
 
 El mismo flujo está disponible como:
 
-- **Colección de Postman** en [`docs/postman/`](docs/postman/): 35 requests con 123 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
+- **Colección de Postman** en [`docs/postman/`](docs/postman/): 37 requests con 126 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
   ```bash
   npx newman run docs/postman/star-wars-api.postman_collection.json \
     -e docs/postman/local.postman_environment.json --delay-request 500
@@ -177,9 +177,37 @@ El campo `type` identifica el problema. Los de la API son:
 | 404 | `/problems/resource-not-found` | El ID no existe en SWAPI |
 | 500 | `/problems/internal-error` | Error inesperado; la respuesta no expone detalles internos |
 | 502 | `/problems/upstream-error` | SWAPI respondió algo que no se puede interpretar |
-| 503 | `/problems/upstream-unavailable` | SWAPI caída, lenta (timeout de 10 s) o con rate limit; incluye `Retry-After` cuando SWAPI lo manda |
+| 503 | `/problems/upstream-unavailable` | SWAPI caída, lenta (timeout de 10 s), con rate limit o con el circuito abierto; incluye `Retry-After` cuando se conoce |
 
 Los errores genéricos de HTTP (ruta inexistente, método no soportado, body ilegible, tipo de parámetro inválido) usan `type: about:blank`, como indica el RFC 9457 cuando el problema no agrega nada al status, y su `title` es el del status.
+
+## Resiliencia y caché
+
+SWAPI es gratuita, desde Render tarda entre 2 y 9 s y limita a 100 requests por IP. El cliente se arma como una cadena de decorators: `CachingSwapiClient → ResilientSwapiClient → SwapiRestClient` ([ADR-007](docs/adr/ADR-007.md), [ADR-011](docs/adr/ADR-011.md)).
+
+**Caché (Caffeine, en memoria):**
+
+| Cache | Clave | Qué guarda |
+|---|---|---|
+| `swapi-list` | recurso + página + límite | Páginas del listado |
+| `swapi-search` | recurso + término (sin espacios y en minúsculas) | Resultado completo de una búsqueda; todas sus páginas salen de ahí |
+| `swapi-detail` | recurso + id | Detalle de una entidad |
+
+- Hasta 1000 entradas por cache, vencen a la hora de escritas.
+- No se cachean errores ni los 404, así un fallo transitorio no queda fijo.
+
+**Retry:** hasta 3 intentos con backoff exponencial (200 ms, 400 ms) ante 5xx, errores de conexión y 429. Ante un 429 se espera el `Retry-After` de SWAPI si es de hasta 2 s; si es mayor, se responde 503 con ese mismo `Retry-After`. Los read timeouts (10 s) y los 4xx no se reintentan.
+
+**Circuit breaker:**
+
+| Parámetro | Valor |
+|---|---|
+| Ventana | últimas 20 llamadas (mínimo 10 para evaluar) |
+| Abre con | 50% de fallas, u 80% de llamadas de más de 8 s |
+| Abierto durante | 30 s, después prueba con 3 llamadas |
+| Cuenta como falla | 5xx, 429, timeout o error de conexión; un 4xx no |
+
+**Si SWAPI se cae:** lo que ya está en caché se sigue sirviendo. El resto responde 503 `upstream-unavailable`: primero tras los reintentos y, cuando el circuito se abre, al instante y con `Retry-After: 30`, sin llamar a SWAPI.
 
 ## Seguridad
 
@@ -208,7 +236,7 @@ dev.starwars
 flowchart LR
     C[Cliente] -->|Bearer JWT| S[Security filter chain]
     C -->|POST /auth/login| A[AuthController] --> T[TokenService]
-    S --> K[Controllers] --> CS[CatalogService] --> SC[SwapiRestClient] --> X[(swapi.tech)]
+    S --> K[Controllers] --> CS[CatalogService] --> CC[CachingSwapiClient] --> R[ResilientSwapiClient] --> RC[SwapiRestClient] --> X[(swapi.tech)]
 ```
 
 `ArchitectureTest` (ArchUnit) verifica en cada build que `api` no use `swapi` ni repositorios, que `service` no dependa de `api`, que `swapi` no dependa de las features y que no haya ciclos.
@@ -228,6 +256,7 @@ flowchart LR
 | Controllers, errores y seguridad | Slice | `@WebMvcTest`, `MockMvcTester`, `spring-security-test` |
 | `SwapiRestClient` | Integración con stub | WireMock |
 | Flujo punta a punta (`CatalogFlowIT`, `SecurityIT`) | `*IT` | `@SpringBootTest` con puerto aleatorio + WireMock |
+| Caché, retry y circuit breaker (`SwapiResilienceIT`) | `*IT` | WireMock con escenarios y `CircuitBreakerRegistry` |
 
 SWAPI se simula con WireMock usando respuestas reales guardadas en `src/test/resources/swapi/` ([ADR-009](docs/adr/ADR-009.md)). Para regenerar una:
 
