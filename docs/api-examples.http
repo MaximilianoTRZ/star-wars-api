@@ -54,3 +54,19 @@ Content-Type: application/json
 {
   "query": "{ person(id: 9999) { name } }"
 }
+
+### MCP: list the tools (stateless Streamable HTTP, JSON-RPC 2.0)
+POST http://localhost:8080/mcp
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+
+### MCP: call search_people
+POST http://localhost:8080/mcp
+Authorization: Bearer {{token}}
+Content-Type: application/json
+Accept: application/json, text/event-stream
+
+{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "search_people", "arguments": {"name": "skywalker"}}}

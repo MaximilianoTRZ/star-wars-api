@@ -1927,6 +1927,359 @@
       ]
     },
     {
+      "name": "MCP",
+      "description": "Same catalog through the MCP server on /mcp (stateless Streamable HTTP, JSON-RPC 2.0). Uses the token saved by Login. Tool results come as JSON text in result.content[0].text.",
+      "item": [
+        {
+          "name": "Initialize",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"initialize\",\n  \"params\": {\n    \"protocolVersion\": \"2025-06-18\",\n    \"capabilities\": {},\n    \"clientInfo\": {\n      \"name\": \"postman\",\n      \"version\": \"1.0\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"server name\", () => pm.expect(body.result.serverInfo.name).to.eql(\"star-wars-api\"));",
+                  "pm.test(\"tools capability\", () => pm.expect(body.result.capabilities).to.have.property(\"tools\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List tools",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const names = body.result.tools.map(t => t.name);",
+                  "pm.test(\"8 tools\", () => pm.expect(names).to.have.lengthOf(8));",
+                  "pm.test(\"search_people and get_film\", () => pm.expect(names).to.include.members([\"search_people\", \"get_film\"]));",
+                  "pm.test(\"read-only\", () => body.result.tools.forEach(t => pm.expect(t.annotations.readOnlyHint).to.eql(true)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "search_people by name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"search_people\",\n    \"arguments\": {\n      \"name\": \"skywalker\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const result = body.result;",
+                  "pm.test(\"not an error\", () => pm.expect(result.isError).to.eql(false));",
+                  "const page = JSON.parse(result.content[0].text);",
+                  "pm.test(\"3 Skywalkers\", () => pm.expect(page.totalElements).to.eql(3));",
+                  "pm.test(\"Luke first\", () => pm.expect(page.content[0].name).to.eql(\"Luke Skywalker\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "get_film detail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_film\",\n    \"arguments\": {\n      \"id\": \"1\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const result = body.result;",
+                  "pm.test(\"not an error\", () => pm.expect(result.isError).to.eql(false));",
+                  "const film = JSON.parse(result.content[0].text);",
+                  "pm.test(\"A New Hope\", () => pm.expect(film.title).to.eql(\"A New Hope\"));",
+                  "pm.test(\"episode 4\", () => pm.expect(film.episodeId).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown id is a clear message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 5,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"get_person\",\n    \"arguments\": {\n      \"id\": \"9999\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const result = body.result;",
+                  "pm.test(\"not an error\", () => pm.expect(result.isError).to.eql(false));",
+                  "pm.test(\"not found message\", () => pm.expect(result.content[0].text).to.include(\"No people found with id 9999\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid size is an error result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 6,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"search_people\",\n    \"arguments\": {\n      \"size\": 500\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const result = body.result;",
+                  "pm.test(\"isError\", () => pm.expect(result.isError).to.eql(true));",
+                  "pm.test(\"size message\", () => pm.expect(result.content[0].text).to.include(\"between 1 and 100\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No token returns 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json, text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 7,\n  \"method\": \"tools/list\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/mcp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "mcp"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"type /problems/unauthorized\", () => pm.expect(pm.response.json().type).to.eql(\"/problems/unauthorized\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Rate limiting",
       "description": "Six logins in a row from the same client: the limit is 5 per minute, so the last one gets 429 with Retry-After. Runs last because it blocks logins for up to a minute.",
       "item": [

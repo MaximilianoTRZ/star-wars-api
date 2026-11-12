@@ -60,4 +60,12 @@ class DomainRecordsTest {
         assertThat(exception.resource()).isEqualTo(CatalogResource.STARSHIPS);
         assertThat(exception.id()).isEqualTo("99");
     }
+
+    @Test
+    void channelByPath() {
+        assertThat(CatalogChannel.forPath("/graphql")).contains(CatalogChannel.GRAPHQL);
+        assertThat(CatalogChannel.forPath("/mcp")).contains(CatalogChannel.MCP);
+        assertThat(CatalogChannel.forPath("/api/v1/people")).isEmpty();
+        assertThat(CatalogChannel.MCP.label()).isEqualTo("mcp");
+    }
 }

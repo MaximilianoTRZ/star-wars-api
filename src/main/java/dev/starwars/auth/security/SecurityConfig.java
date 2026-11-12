@@ -35,7 +35,7 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li><b>Actuator:</b> its own chain. Locally it runs on a management port that is never published and is
  *       open; in {@code prod} it shares the public port and {@code /actuator/prometheus} requires HTTP Basic
  *       with the scrape credentials ({@link MetricsScrapeProperties}).</li>
- *   <li><b>Authorization:</b> {@code /api/v1/**} and {@code /graphql} require the {@code SCOPE_catalog:read}
+ *   <li><b>Authorization:</b> {@code /api/v1/**}, {@code /graphql} and {@code /mcp} require the {@code SCOPE_catalog:read}
  *       authority, taken from the JWT {@code scope} claim. Being authenticated is not enough.</li>
  *   <li><b>Stateless:</b> no HTTP session. CSRF is disabled because there are no cookies: the token travels
  *       in the {@code Authorization} header, which browsers never send on their own.</li>
@@ -117,7 +117,7 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/error")
                         .permitAll()
-                        .requestMatchers("/api/v1/**", "/graphql")
+                        .requestMatchers("/api/v1/**", "/graphql", "/mcp")
                         .hasAuthority("SCOPE_" + CATALOG_READ_SCOPE)
                         .anyRequest()
                         .denyAll())

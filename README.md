@@ -30,7 +30,7 @@
 > 7. **Despliegue:**
 >     - Se recomienda desplegar la aplicación en algún servidor gratuito, como Heroku o Vercel, para facilitar la prueba de la app.
 
-API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starships y Vehicles con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. El mismo catálogo se consulta también por [GraphQL](#graphql). Java 21 + Spring Boot 4.1.
+API REST sobre [SWAPI](https://www.swapi.tech) que expone People, Films, Starships y Vehicles con paginación uniforme, filtros por ID y/o nombre y autenticación JWT. El mismo catálogo se consulta también por [GraphQL](#graphql) y desde clientes de IA como Claude, con un [servidor MCP](#mcp). Java 21 + Spring Boot 4.1.
 
 El diseño, las fases de implementación y las decisiones están en el [RFC](docs/RFC.md) y en los [ADRs](docs/adr/).
 
@@ -43,7 +43,7 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 3 | Filtrado por ID y/o nombre | `CatalogService` elige la estrategia según la combinación de filtros |
 | 4 | Login seguro, autenticación y autorización | JWT HS256 emitido por `POST /api/v1/auth/login` y validado con OAuth2 Resource Server; scope `catalog:read`; contraseñas con BCrypt |
 | 5 | Documentación | Este README, Swagger UI, Javadoc, el [RFC](docs/RFC.md) y los [ADRs](docs/adr/) |
-| 6 | Tests unitarios y de integración | 225 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
+| 6 | Tests unitarios y de integración | 245 tests: JUnit 5, Mockito, AssertJ, MockMvc, WireMock y `@SpringBootTest`. Ninguno llama a SWAPI real |
 | 7 | Despliegue | Docker multi-stage en Render, con deploy automático desde `main` |
 
 ## Cómo se construyó
@@ -58,7 +58,7 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 3 | [`v1.2.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.2.0) | Métricas técnicas y de negocio, correlation ID, Prometheus y Grafana como código, dashboard público | Saber qué pasa en producción sin entrar al servidor | [Observabilidad](#observabilidad) |
 | 4 | [`v1.3.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.3.0) | Rate limiting del login, logging de producción, notas de escalabilidad | Frenar fuerza bruta y diagnosticar desde los logs de Render | [Seguridad](#seguridad), [Logs](#logs-y-correlación), [Escalabilidad](#cómo-lo-escalaría) |
 | 5 | [`v1.4.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.4.0) | GraphQL y GraphiQL sobre el mismo `CatalogService`, con la fila de alertas en el dashboard | Consultas con la forma que pide el cliente, sin duplicar lógica | [GraphQL](#graphql) |
-| 6 | `v1.5.0` (planificada) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [RFC §10](docs/RFC.md#10-fase-6--servidor-mcp-2-3-h-tag-v150) |
+| 6 | `v1.5.0` (en curso) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [MCP](#mcp) |
 
 El detalle de cada fase (work units, tests, decisiones SOLID y criterios de salida) está en el [RFC](docs/RFC.md); las decisiones de diseño, en los [ADRs](#decisiones-de-diseño).
 
@@ -66,6 +66,7 @@ El detalle de cada fase (work units, tests, decisiones SOLID y criterios de sali
 
 - **Swagger UI:** https://star-wars-api-ailb.onrender.com/swagger-ui.html
 - **GraphiQL:** https://star-wars-api-ailb.onrender.com/graphiql
+- **Servidor MCP:** https://star-wars-api-ailb.onrender.com/mcp (ver [MCP](#mcp))
 - **Dashboard en vivo (Grafana Cloud):** https://magentaosprey3543.grafana.net/public-dashboards/c1eb26ffdec84e1fa902aa1efc509e6f
 - **API:** https://star-wars-api-ailb.onrender.com/api/v1
 - **Usuario demo:** `demo` / `6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq` (en local: `demo` / `demo123`)
@@ -85,7 +86,9 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **REST desde Swagger UI:** abrir `POST /api/v1/auth/login` y apretar **Execute**: el body ya trae el usuario demo del entorno (en Render, la contraseña de arriba; en local, `demo123`) y el `accessToken` de la respuesta se carga solo en **Authorize**. Después se puede llamar a cualquier endpoint del catálogo sin copiar el token; los formularios ya vienen en modo *Try it out*.
 
-**Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST y GraphQL) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
+**Desde Claude Code (MCP):** con el `TOKEN` del comando de arriba, `claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"` y preguntarle, por ejemplo, "¿qué naves aparecen en A New Hope?". Más detalle en [MCP](#mcp).
+
+**Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST, GraphQL y MCP) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
 Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 170 s en arrancar (medido en el deploy de la Fase 5), así que si la instancia está dormida el primer request puede tardar unos 3 minutos. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
@@ -191,7 +194,7 @@ curl -s "$BASE/api/v1/starships/9" -H "Authorization: Bearer $TOKEN"
 
 El mismo flujo está disponible como:
 
-- **Colección de Postman** en [`docs/postman/`](docs/postman/): 54 requests con 167 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). La carpeta "Rate limiting" va al final porque bloquea los logins durante hasta un minuto. Por línea de comandos:
+- **Colección de Postman** en [`docs/postman/`](docs/postman/): 61 requests con 190 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). La carpeta "Rate limiting" va al final porque bloquea los logins durante hasta un minuto. Por línea de comandos:
   ```bash
   npx newman run docs/postman/star-wars-api.postman_collection.json \
     -e docs/postman/local.postman_environment.json --delay-request 500
@@ -326,6 +329,62 @@ curl -s $BASE/graphql -H "Authorization: Bearer $TOKEN" -H 'Content-Type: applic
 | `INTERNAL_ERROR` | `/problems/internal-error` | Error inesperado, sin detalles internos |
 
 Sin token o sin el scope `catalog:read`, `/graphql` responde 401 o 403 con `ProblemDetail`, antes de llegar a GraphQL. Una query con más de 5 campos raíz se rechaza sin ejecutarse (ver [Seguridad](#seguridad)).
+
+## MCP
+
+El catálogo también se expone como servidor [MCP](https://modelcontextprotocol.io) en `/mcp`, para que un cliente de IA (Claude Code, Claude Desktop, Cursor) lo consulte con tools. Las tools delegan en el mismo `CatalogService` que REST y GraphQL y devuelven los mismos DTOs como JSON. El servidor no llama a ningún modelo: el modelo lo pone el cliente ([ADR-016](docs/adr/ADR-016.md)).
+
+- **Transporte:** Streamable HTTP *stateless* ([ADR-019](docs/adr/ADR-019.md)). No guarda sesión: cualquier réplica atiende cualquier llamada, y responde JSON plano.
+- **Seguridad:** el mismo JWT y el scope `catalog:read`, en el header `Authorization`. Sin token, 401 antes de llegar a MCP.
+
+| Tool | Argumentos | Devuelve |
+|---|---|---|
+| `search_people`, `search_starships`, `search_vehicles` | `name`, `id`, `page`, `size` (todos opcionales) | Página de `{id, name}` |
+| `search_films` | `title`, `id`, `page`, `size` (todos opcionales) | Página de `{id, title}` |
+| `get_person`, `get_film`, `get_starship`, `get_vehicle` | `id` | Detalle completo |
+
+Todas son de solo lectura (`readOnlyHint`). Un ID inexistente devuelve un mensaje claro (`No people found with id 9999…`), y una entrada inválida o una falla de SWAPI devuelven un resultado con `isError` y el mismo texto público que el `detail` de REST, sin detalles internos.
+
+**Desde Claude Code:**
+
+```bash
+BASE=https://star-wars-api-ailb.onrender.com   # o http://localhost:8080 (usuario demo / demo123)
+TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq"}' | jq -r .accessToken)
+claude mcp add --transport http star-wars $BASE/mcp --header "Authorization: Bearer $TOKEN"
+```
+
+Después, en Claude Code: "¿qué naves aparecen en A New Hope?" o "comparame el Halcón Milenario con la Estrella de la Muerte". `/mcp` dentro de Claude Code muestra el servidor y sus tools.
+
+**Desde Claude Desktop:** los conectores remotos de Claude Desktop no permiten agregar headers, así que se usa el proxy [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) en `claude_desktop_config.json`, reemplazando `<token>`:
+
+```json
+{
+  "mcpServers": {
+    "star-wars": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://star-wars-api-ailb.onrender.com/mcp",
+               "--header", "Authorization: Bearer <token>"]
+    }
+  }
+}
+```
+
+**Cuando el token vence** (1 hora), las tools responden 401. Hay que repetir el login y volver a configurar el header: en Claude Code, `claude mcp remove star-wars` y el `claude mcp add` de arriba; en Claude Desktop, reemplazar el token y reiniciar la app.
+
+**Sin cliente de IA**, con curl (JSON-RPC 2.0):
+
+```bash
+curl -s $BASE/mcp -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_people","arguments":{"name":"skywalker"}}}'
+```
+
+```json
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\"content\":[{\"id\":\"1\",\"name\":\"Luke Skywalker\"},{\"id\":\"11\",\"name\":\"Anakin Skywalker\"},{\"id\":\"43\",\"name\":\"Shmi Skywalker\"}],\"page\":1,\"size\":10,\"totalElements\":3,\"totalPages\":1}"}],"isError":false}}
+```
+
+Con `"method":"tools/list"` devuelve las 8 tools con sus descripciones y el esquema de sus argumentos.
 
 ## Resiliencia y caché
 
@@ -475,7 +534,7 @@ La captura es de la fila **Alerts** después de una ráfaga de logins con contra
 
 | Métrica | Tipo | Tags | Pregunta que responde |
 |---|---|---|---|
-| `catalog.queries` | Counter | `resource`, `filter` (`none`, `id`, `name`, `id_and_name`), `channel` (`rest`, `graphql`) | ¿Qué se consulta, cómo se filtra y por qué canal? |
+| `catalog.queries` | Counter | `resource`, `filter` (`none`, `id`, `name`, `id_and_name`), `channel` (`rest`, `graphql`, `mcp`) | ¿Qué se consulta, cómo se filtra y por qué canal? |
 | `catalog.entity.views` | Counter | `resource`, `entity` | ¿Qué entidades son las más consultadas? |
 | `catalog.searches.empty` | Counter | `resource` | ¿Qué porcentaje de búsquedas no encuentra nada? |
 | `catalog.page.requested` | DistributionSummary | `resource` | ¿Hasta qué página navegan? |
@@ -490,7 +549,7 @@ Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics
 
 - `CorrelationIdFilter` corre primero en la cadena: reusa el `X-Request-Id` del request si es corto y alfanumérico, o genera un UUID. Lo pone en el MDC y lo devuelve en el header `X-Request-Id`.
 - El mismo ID aparece en cada línea de log del request y en el campo `requestId` de los errores, así una respuesta fallida se cruza con su log.
-- En local los logs son texto legible; en `prod` son JSON con formato ECS, con `requestId`, `user`, `channel` (`graphql` en las queries GraphQL) y los datos de cada evento como campos.
+- En local los logs son texto legible; en `prod` son JSON con formato ECS, con `requestId`, `user`, `channel` (`graphql` o `mcp` según el adaptador) y los datos de cada evento como campos.
 - Nunca se loguean contraseñas, tokens ni el header `Authorization`.
 - Cada evento se loguea una vez, donde se decide ([ADR-018](docs/adr/ADR-018.md)):
 
@@ -512,7 +571,7 @@ Para seguir una request en Render: copiar el `requestId` del error (o del header
 
 - **Login:** `AuthenticationManager` + `DaoAuthenticationProvider`, con contraseñas en BCrypt guardadas en H2 ([ADR-005](docs/adr/ADR-005.md)). Usuario inexistente y contraseña incorrecta devuelven el mismo error.
 - **Token:** JWT HS256 de 1 h con `iss`, `sub`, `iat`, `exp` y `scope: catalog:read`. Lo valida el OAuth2 Resource Server de Spring: firma, expiración e issuer ([ADR-004](docs/adr/ADR-004.md)).
-- **Autorización:** los endpoints del catálogo y `/graphql` exigen el scope `catalog:read`; estar autenticado no alcanza.
+- **Autorización:** los endpoints del catálogo, `/graphql` y `/mcp` exigen el scope `catalog:read`; estar autenticado no alcanza.
 - **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI, GraphiQL y los probes `/livez` y `/readyz`. Cualquier otra ruta sin token responde 401.
 - **Métricas:** en local Actuator vive en el puerto de management (8081), que no se publica. En Render comparte el puerto público y `/actuator/prometheus` exige HTTP Basic con un usuario propio, que no sirve para llamar a la API ([ADR-015](docs/adr/ADR-015.md)).
 - **Rate limiting del login:** 5 intentos por minuto por IP (Bucket4j). El 6º responde 429 con `Retry-After` antes de verificar las credenciales, y cuenta como `auth.login.attempts{result="blocked"}`. En Render la IP sale de `CF-Connecting-IP`, que pone Cloudflare (delante de Render) y que el cliente no puede falsear; `X-Forwarded-For` se ignora porque su primer valor lo elige el cliente. En local se usa la IP de la conexión. Los buckets viven en memoria y vencen a los 10 min sin uso: con varias réplicas el límite no se comparte (ver [Cómo lo escalaría](#cómo-lo-escalaría)).
@@ -528,7 +587,7 @@ Monolito modular, organizado por feature y con dependencias en una sola direcci�
 ```
 dev.starwars
 ├── auth/       login, JWT y usuarios (api · service · domain · security)
-├── catalog/    controllers, GraphQL, CatalogService y Paginator (api · graphql · service · domain)
+├── catalog/    controllers, GraphQL, tools MCP, CatalogService y Paginator (api · graphql · mcp · service · domain)
 ├── swapi/      cliente de SWAPI: el único paquete que conoce su formato
 ├── common/     manejo de errores (ProblemDetail y errores GraphQL) y correlation ID
 └── config/     RestClient, OpenAPI, reloj
@@ -539,10 +598,11 @@ flowchart LR
     C[Cliente] -->|Bearer JWT| S[Security filter chain]
     C -->|POST /auth/login| A[AuthController] --> T[TokenService]
     S --> K[Controllers] --> CS[CatalogService]
+    S --> M[MCP tools] --> CS
     S --> G[GraphQL controller] --> CS --> CC[CachingSwapiClient] --> R[ResilientSwapiClient] --> RC[SwapiRestClient] --> X[(swapi.tech)]
 ```
 
-`ArchitectureTest` (ArchUnit) verifica en cada build que `api` y `graphql` no usen `swapi` ni repositorios, que `service` no dependa de `api` ni de `graphql`, que `api` no dependa de `graphql`, que `swapi` no dependa de las features y que no haya ciclos.
+`ArchitectureTest` (ArchUnit) verifica en cada build que `api`, `graphql` y `mcp` no usen `swapi` ni repositorios, que `service` no dependa de ningún adaptador (`api`, `graphql`, `mcp`), que los adaptadores no dependan entre sí, que `swapi` no dependa de las features y que no haya ciclos.
 
 ## Tests
 
@@ -558,8 +618,9 @@ flowchart LR
 | `Paginator`, `CatalogService`, `TokenService` | Unitario | JUnit 5, Mockito, AssertJ |
 | Controllers, errores y seguridad | Slice | `@WebMvcTest`, `MockMvcTester`, `spring-security-test` |
 | Queries y errores GraphQL | Slice | `@GraphQlTest`, `GraphQlTester` |
+| Tools MCP | Unitario | JUnit 5, Mockito |
 | `SwapiRestClient` | Integración con stub | WireMock |
-| Flujo punta a punta (`CatalogFlowIT`, `SecurityIT`, `GraphQlIT`) | `*IT` | `@SpringBootTest` con puerto aleatorio + WireMock |
+| Flujo punta a punta (`CatalogFlowIT`, `SecurityIT`, `GraphQlIT`, `McpIT`) | `*IT` | `@SpringBootTest` con puerto aleatorio + WireMock; `McpIT` usa el cliente del MCP SDK |
 | Caché, retry y circuit breaker (`SwapiResilienceIT`) | `*IT` | WireMock con escenarios y `CircuitBreakerRegistry` |
 | Puerto de management y scrape protegido (`ManagementPortIT`, `MetricsScrapeIT`) | `*IT` | `@SpringBootTest` + `@LocalManagementPort` |
 
@@ -607,6 +668,7 @@ Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en códig
 | [016](docs/adr/ADR-016.md) | GraphQL y MCP como adaptadores del mismo `CatalogService` |
 | [017](docs/adr/ADR-017.md) | Swagger UI y GraphiQL públicos en producción |
 | [018](docs/adr/ADR-018.md) | Estrategia de logging para producción |
+| [019](docs/adr/ADR-019.md) | Servidor MCP stateless con el JWT en un header |
 
 ## ¿Por qué no microservicios?
 
