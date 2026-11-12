@@ -7,6 +7,7 @@ import dev.starwars.support.ApiClient;
 import dev.starwars.support.TestTokens;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -83,5 +84,27 @@ class SecurityIT {
     @DisplayName("a route outside the public ones and the API is rejected without a token")
     void denyByDefault() {
         assertThat(api.get("/internal/anything", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("the OpenAPI document declares bearer auth and ProblemDetail errors")
+    void openApiDocument() {
+        String docs = api.get("/v3/api-docs", null).getBody();
+
+        assertThat(JsonPath.<String>read(docs, "$.components.securitySchemes.bearerAuth.scheme"))
+                .isEqualTo("bearer");
+        assertThat(JsonPath.<Map<String, Object>>read(docs, "$.paths['/api/v1/people/{id}'].get.responses"))
+                .containsKeys("200", "401", "403", "404", "503");
+        assertThat(JsonPath.<Map<String, Object>>read(docs, "$.paths['/api/v1/auth/login'].post.responses"))
+                .containsKeys("200", "400", "401")
+                .doesNotContainKey("403");
+        assertThat(
+                        JsonPath.<String>read(
+                                docs,
+                                "$.paths['/api/v1/people/{id}'].get.responses.404.content['application/problem+json'].schema.$ref"))
+                .isEqualTo("#/components/schemas/ProblemDetail");
+        assertThat(JsonPath.<Map<String, Object>>read(docs, "$.components.schemas.ProblemDetail.properties"))
+                .containsKeys("type", "title", "status", "detail", "instance");
+        assertThat(JsonPath.<String>read(docs, "$.info.version")).matches("\\d+\\.\\d+\\.\\d+.*");
     }
 }
