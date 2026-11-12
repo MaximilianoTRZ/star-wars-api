@@ -83,7 +83,7 @@ open "$BASE/graphiql?path=/graphql#token=$TOKEN"   # en Linux: xdg-open
 
 El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía al servidor, y la página lo borra de la barra de direcciones al cargarlo. Sin terminal: abrir [GraphiQL](https://star-wars-api-ailb.onrender.com/graphiql), que ya trae la query de ejemplo, y reemplazar `<token from POST /api/v1/auth/login>` en el panel **Headers** por un token sacado de Swagger UI. Más detalle en [GraphQL](#graphql).
 
-**REST desde Swagger UI:** ejecutar `POST /api/v1/auth/login` con el usuario demo, copiar el `accessToken`, pegarlo en **Authorize** y llamar a cualquier endpoint del catálogo.
+**REST desde Swagger UI:** abrir `POST /api/v1/auth/login` y apretar **Execute**: el body ya trae el usuario demo del entorno (en Render, la contraseña de arriba; en local, `demo123`) y el `accessToken` de la respuesta se carga solo en **Authorize**. Después se puede llamar a cualquier endpoint del catálogo sin copiar el token; los formularios ya vienen en modo *Try it out*.
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST y GraphQL) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
@@ -114,7 +114,7 @@ docker run -p 8080:8080 star-wars-api
 ./mvnw spring-boot:run
 ```
 
-Después abrir http://localhost:8080/swagger-ui.html y hacer login con `demo` / `demo123`.
+Después abrir http://localhost:8080/swagger-ui.html, ejecutar `POST /api/v1/auth/login` (ya trae `demo` / `demo123`) y llamar a cualquier endpoint: el token se aplica solo.
 
 ## Configuración
 
