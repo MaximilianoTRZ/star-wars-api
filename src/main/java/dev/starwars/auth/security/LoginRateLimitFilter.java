@@ -7,6 +7,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,8 @@ class LoginRateLimitFilter extends OncePerRequestFilter {
 
     static final String LOGIN_PATH = "/api/v1/auth/login";
 
+    private static final Logger log = LoggerFactory.getLogger(LoginRateLimitFilter.class);
+
     private final LoginRateLimiter limiter;
     private final ProblemDetailResponseWriter writer;
     private final AuthMetrics metrics;
@@ -45,13 +49,21 @@ class LoginRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        Decision decision = limiter.tryConsume(request.getRemoteAddr());
+        String clientIp = request.getRemoteAddr();
+        Decision decision = limiter.tryConsume(clientIp);
         if (decision.allowed()) {
             chain.doFilter(request, response);
             return;
         }
         metrics.loginBlocked();
         long retryAfterSeconds = Math.max(1, (decision.retryAfter().toMillis() + 999) / 1000);
+        log.atWarn()
+                .setMessage("Login blocked by rate limit for {}, retry in {}s")
+                .addArgument(clientIp)
+                .addArgument(retryAfterSeconds)
+                .addKeyValue("client.ip", clientIp)
+                .addKeyValue("retry_after_s", retryAfterSeconds)
+                .log();
         response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
         writer.write(
                 request,

@@ -3,13 +3,17 @@ package dev.starwars.auth.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
+import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.WebSliceTestConfig;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -25,6 +29,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 // The login rate limit is covered by LoginRateLimitIT; here it would block the repeated logins
 @WebMvcTest(controllers = AuthController.class, properties = "app.security.login-rate-limit.capacity=1000")
 @Import(WebSliceTestConfig.class)
+@ExtendWith(OutputCaptureExtension.class)
 class AuthControllerTest {
 
     @Autowired
@@ -66,6 +71,22 @@ class AuthControllerTest {
         assertThat(result).bodyJson().extractingPath("$.tokenType").isEqualTo("Bearer");
         assertThat(result).bodyJson().extractingPath("$.expiresIn").isEqualTo(3600);
         assertThat(result).bodyJson().extractingPath("$.accessToken").asString().contains(".");
+    }
+
+    @Test
+    @DisplayName("logs a success with the user and a failure without username, password or token")
+    void logsLoginOutcome(CapturedOutput output) throws Exception {
+        MvcTestResult ok = login("{\"username\":\"demo\",\"password\":\"demo123\"}");
+        login("{\"username\":\"typed-secret\",\"password\":\"wrong-secret\"}");
+
+        String token = JsonPath.read(ok.getResponse().getContentAsString(StandardCharsets.UTF_8), "$.accessToken");
+        assertThat(output)
+                .containsPattern("INFO .*Login succeeded for demo")
+                .containsPattern("WARN .*Login failed from ")
+                .doesNotContain("demo123")
+                .doesNotContain("typed-secret")
+                .doesNotContain("wrong-secret")
+                .doesNotContain(token);
     }
 
     @Test

@@ -6,8 +6,11 @@ import com.jayway.jsonpath.JsonPath;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -23,6 +26,7 @@ import org.springframework.web.client.RestClient;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"app.security.login-rate-limit.capacity=5", "server.forward-headers-strategy=framework"})
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class LoginRateLimitIT {
 
     private static final String BODY = "{\"username\":\"demo\",\"password\":\"test-password\"}";
@@ -49,7 +53,7 @@ class LoginRateLimitIT {
 
     @Test
     @DisplayName("the 6th login in a minute from the same IP gets 429 with Retry-After; another IP is not affected")
-    void sixthLoginIsRejected() {
+    void sixthLoginIsRejected(CapturedOutput output) {
         double blockedBefore = registry.get("auth.login.attempts")
                 .tag("result", "blocked")
                 .counter()
@@ -72,5 +76,8 @@ class LoginRateLimitIT {
                         .counter()
                         .count())
                 .isEqualTo(blockedBefore + 1);
+        assertThat(output)
+                .containsPattern("WARN .*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s")
+                .containsPattern("INFO .*POST /api/v1/auth/login 429");
     }
 }

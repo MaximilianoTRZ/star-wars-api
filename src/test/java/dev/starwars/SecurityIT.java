@@ -11,7 +11,10 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 /** Security against the running app: real login backed by H2, public routes and authorization. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class SecurityIT {
 
     private static final String TEST_SECRET = "test-secret-0123456789-0123456789-0123456789";
@@ -65,20 +69,24 @@ class SecurityIT {
 
     @Test
     @DisplayName("a 401 from the security filters carries the correlation ID in header and body")
-    void correlationIdOnSecurityError() {
+    void correlationIdOnSecurityError(CapturedOutput output) {
         ResponseEntity<String> response = api.get("/api/v1/people", null);
 
         String requestId = response.getHeaders().getFirst("X-Request-Id");
         assertThat(requestId).isNotBlank();
         assertThat(JsonPath.<String>read(response.getBody(), "$.requestId")).isEqualTo(requestId);
+        assertThat(output)
+                .containsPattern("\\[" + requestId + "] .*Request rejected as unauthenticated")
+                .containsPattern("\\[" + requestId + "] .*GET /api/v1/people 401");
     }
 
     @Test
     @DisplayName("a token without the catalog:read scope returns 403")
-    void tokenWithoutScope() {
+    void tokenWithoutScope(CapturedOutput output) {
         String token = TestTokens.sign(TEST_SECRET, "star-wars-api", Instant.now(), Duration.ofMinutes(5), null);
 
         assertThat(api.get("/api/v1/people", token).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(output).containsPattern("INFO .*Request forbidden").doesNotContain(token);
     }
 
     @Test

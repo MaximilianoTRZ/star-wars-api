@@ -20,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -37,6 +38,7 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li><b>Stateless:</b> no HTTP session. CSRF is disabled because there are no cookies: the token travels
  *       in the {@code Authorization} header, which browsers never send on their own.</li>
  *   <li><b>Errors:</b> 401 and 403 return {@code ProblemDetail}, like the rest of the API.</li>
+ *   <li><b>Logs:</b> the token's user goes to the MDC ({@link AuthenticatedUserFilter}).</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
@@ -120,7 +122,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler));
+                        .accessDeniedHandler(accessDeniedHandler))
+                .addFilterAfter(new AuthenticatedUserFilter(), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
