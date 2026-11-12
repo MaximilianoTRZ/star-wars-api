@@ -34,6 +34,11 @@ app:
       # Local development default only. The prod profile requires DEMO_USER_PASSWORD.
       password: ${DEMO_USER_PASSWORD:demo123}
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    persist-authorization: true
+
 management:
   endpoints:
     web:
