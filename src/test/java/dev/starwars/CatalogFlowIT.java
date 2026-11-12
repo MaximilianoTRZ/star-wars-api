@@ -11,6 +11,7 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.ApiClient;
 import dev.starwars.support.Fixtures;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +21,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -45,6 +48,12 @@ class CatalogFlowIT {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakers;
 
     private ApiClient api;
     private String token;
@@ -128,6 +137,8 @@ class CatalogFlowIT {
 
     @BeforeEach
     void login() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+        circuitBreakers.circuitBreaker("swapi").reset();
         api = new ApiClient(port);
         token = api.login("demo", "test-password");
     }

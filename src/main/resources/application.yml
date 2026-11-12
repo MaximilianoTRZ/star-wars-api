@@ -8,6 +8,12 @@ spring:
     url: jdbc:h2:mem:starwars;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
+  cache:
+    # Declared up front so their metrics are registered at startup
+    cache-names: swapi-list,swapi-search,swapi-detail
+    caffeine:
+      # SWAPI data is practically static
+      spec: maximumSize=1000,expireAfterWrite=1h,recordStats
   jpa:
     open-in-view: false
     hibernate:
@@ -23,6 +29,11 @@ app:
     connect-timeout: 2s
     # SWAPI takes 2 to 9 s per request from Render
     read-timeout: 10s
+    retry:
+      initial-backoff: 200ms
+      multiplier: 2
+      # A longer Retry-After is passed on to the client instead of waiting
+      max-retry-after: 2s
   security:
     jwt:
       # Local development default only. The prod profile requires JWT_SECRET.
@@ -33,6 +44,29 @@ app:
       username: demo
       # Local development default only. The prod profile requires DEMO_USER_PASSWORD.
       password: ${DEMO_USER_PASSWORD:demo123}
+
+resilience4j:
+  retry:
+    instances:
+      swapi:
+        max-attempts: 3
+  circuitbreaker:
+    instances:
+      swapi:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        # Normal latency from Render reaches 9 s
+        slow-call-duration-threshold: 8s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exceptions:
+          - dev.starwars.swapi.UpstreamUnavailableException
+        ignore-exceptions:
+          - dev.starwars.swapi.SwapiClientException
 
 springdoc:
   swagger-ui:

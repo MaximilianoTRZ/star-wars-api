@@ -3,6 +3,8 @@ app:
     base-url: http://localhost:0
     connect-timeout: 2s
     read-timeout: 3s
+    retry:
+      initial-backoff: 10ms
   security:
     jwt:
       secret: test-secret-0123456789-0123456789-0123456789
