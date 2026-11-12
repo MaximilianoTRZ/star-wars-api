@@ -23,6 +23,7 @@
         <argLine/>
         <archunit.version>1.5.1</archunit.version>
         <springdoc.version>3.1.1</springdoc.version>
+        <spring-ai.version>2.0.2</spring-ai.version>
         <!-- resilience4j-spring-boot4 is not in the 2.4.0 BOM: explicit version -->
         <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
@@ -35,6 +36,18 @@
         <sonar.organization>maximilianotrz</sonar.organization>
         <sonar.projectKey>MaximilianoTRZ_star-wars-api</sonar.projectKey>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -99,6 +112,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-graphql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
         <dependency>
             <!-- Carries the MDC to the threads that run GraphQL queries (ContextPropagationConfig) -->

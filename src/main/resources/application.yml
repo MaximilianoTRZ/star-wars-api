@@ -18,6 +18,22 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: create-drop
+  ai:
+    mcp:
+      server:
+        # Stateless Streamable HTTP on /mcp: no session kept in memory, any replica answers any call (ADR-019)
+        protocol: STATELESS
+        name: star-wars-api
+        version: "@project.version@"
+        instructions: >-
+          Star Wars catalog from SWAPI: people, films, starships and vehicles. Use the search_* tools to find
+          items by name (films by title) and the get_* tools for every attribute of one item. Listings are
+          paginated (page from 1, size up to 100).
+        capabilities:
+          # Only tools are exposed
+          resource: false
+          prompt: false
+          completion: false
   graphql:
     graphiql:
       # Public in every profile, like Swagger UI (ADR-017): every query to /graphql still needs the JWT

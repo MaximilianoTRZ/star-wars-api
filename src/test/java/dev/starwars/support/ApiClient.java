@@ -39,6 +39,17 @@ public final class ApiClient {
                 .toEntity(String.class);
     }
 
+    public ResponseEntity<String> postWithToken(String uri, String json, String token) {
+        return restClient
+                .post()
+                .uri(uri)
+                .contentType(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .body(json)
+                .retrieve()
+                .toEntity(String.class);
+    }
+
     /** Posts a GraphQL query to {@code /graphql}; {@code token} may be {@code null}. */
     public ResponseEntity<String> graphql(String query, String token) {
         return restClient
