@@ -57,7 +57,7 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 | 2 | [`v1.1.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.1.0) | Caché Caffeine, retry y circuit breaker sobre el cliente de SWAPI | SWAPI tarda entre 2 y 9 s desde Render y tiene rate limit | [Resiliencia y caché](#resiliencia-y-caché) |
 | 3 | [`v1.2.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.2.0) | Métricas técnicas y de negocio, correlation ID, Prometheus y Grafana como código, dashboard público | Saber qué pasa en producción sin entrar al servidor | [Observabilidad](#observabilidad) |
 | 4 | [`v1.3.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.3.0) | Rate limiting del login, logging de producción, notas de escalabilidad | Frenar fuerza bruta y diagnosticar desde los logs de Render | [Seguridad](#seguridad), [Logs](#logs-y-correlación), [Escalabilidad](#cómo-lo-escalaría) |
-| 5 | `v1.4.0` (en curso) | GraphQL y GraphiQL sobre el mismo `CatalogService` | Consultas con la forma que pide el cliente, sin duplicar lógica | [GraphQL](#graphql) |
+| 5 | [`v1.4.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.4.0) | GraphQL y GraphiQL sobre el mismo `CatalogService`, con la fila de alertas en el dashboard | Consultas con la forma que pide el cliente, sin duplicar lógica | [GraphQL](#graphql) |
 | 6 | `v1.5.0` (planificada) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [RFC §10](docs/RFC.md#10-fase-6--servidor-mcp-2-3-h-tag-v150) |
 
 El detalle de cada fase (work units, tests, decisiones SOLID y criterios de salida) está en el [RFC](docs/RFC.md); las decisiones de diseño, en los [ADRs](#decisiones-de-diseño).

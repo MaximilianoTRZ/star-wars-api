@@ -783,11 +783,11 @@ type PersonPage { content: [PersonSummary!]!, page: Int!, size: Int!, totalEleme
 
 ### Salida de la fase
 
-- [ ] `/graphql` funcionando en la URL de Render, protegido con JWT
-- [ ] GraphiQL (`/graphiql`) accesible en la URL de Render, junto a Swagger UI (`/swagger-ui.html`)
-- [ ] Tests del adaptador GraphQL en verde
+- [x] `/graphql` funcionando en la URL de Render, protegido con JWT
+- [x] GraphiQL (`/graphiql`) accesible en la URL de Render, junto a Swagger UI (`/swagger-ui.html`)
+- [x] Tests del adaptador GraphQL en verde
 - [ ] Arranque y memoria revisados en Render
-- [ ] Tag `v1.4.0`
+- [x] Tag `v1.4.0`
 
 ## 10. Fase 6 — Servidor MCP (~2-3 h, tag `v1.5.0`)
 
