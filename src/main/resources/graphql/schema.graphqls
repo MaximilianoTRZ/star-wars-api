@@ -7,9 +7,9 @@ type Query {
   "Paginated list of people. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
   people(
     "1-based page number"
-    page: Int = 1
+    page: Int! = 1
     "Page size (1-100)"
-    size: Int = 10
+    size: Int! = 10
     "Exact SWAPI id"
     id: ID
     "Text the name must contain"
@@ -22,9 +22,9 @@ type Query {
   "Paginated list of films. Filter by id and/or title (case-insensitive contains). An unknown id returns an empty page."
   films(
     "1-based page number"
-    page: Int = 1
+    page: Int! = 1
     "Page size (1-100)"
-    size: Int = 10
+    size: Int! = 10
     "Exact SWAPI id"
     id: ID
     "Text the title must contain"
@@ -37,9 +37,9 @@ type Query {
   "Paginated list of starships. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
   starships(
     "1-based page number"
-    page: Int = 1
+    page: Int! = 1
     "Page size (1-100)"
-    size: Int = 10
+    size: Int! = 10
     "Exact SWAPI id"
     id: ID
     "Text the name must contain"
@@ -52,9 +52,9 @@ type Query {
   "Paginated list of vehicles. Filter by id and/or name (case-insensitive contains). An unknown id returns an empty page."
   vehicles(
     "1-based page number"
-    page: Int = 1
+    page: Int! = 1
     "Page size (1-100)"
-    size: Int = 10
+    size: Int! = 10
     "Exact SWAPI id"
     id: ID
     "Text the name must contain"

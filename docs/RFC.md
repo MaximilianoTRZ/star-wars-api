@@ -736,9 +736,9 @@ MCP tools (F6) ────┘
 
 ```graphql
 type Query {
-  people(page: Int = 1, size: Int = 10, id: ID, name: String): PersonPage!
+  people(page: Int! = 1, size: Int! = 10, id: ID, name: String): PersonPage!
   person(id: ID!): Person
-  films(page: Int = 1, size: Int = 10, id: ID, title: String): FilmPage!
+  films(page: Int! = 1, size: Int! = 10, id: ID, title: String): FilmPage!
   film(id: ID!): Film
   # starships y vehicles con la misma forma
 }
