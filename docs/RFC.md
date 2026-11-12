@@ -685,6 +685,16 @@ Sección "Cómo lo escalaría" en el README, y revisión de "¿Por qué no micro
 3. Sincronizar SWAPI a una base propia (PostgreSQL o MongoDB) con un job periódico: la API deja de depender de la disponibilidad de SWAPI y puede filtrar con índices.
 4. Microservicios solo si aparece la necesidad (equipos separados o cargas muy distintas), detrás de un API Gateway, con OpenTelemetry y lo listado en "En un ecosistema de microservicios" (sección 3).
 
+### WU 4.3 — Estrategia de logging
+
+Disparador: un `WARN` de connect timeout en Render cuya request respondió 200 porque el retry la recuperó, sin que el log lo mostrara. Decisión y reglas en ADR-018.
+
+- `RequestLoggingFilter`, después de `CorrelationIdFilter`: una línea por request con método, ruta (patrón), status, duración y usuario. `WARN` si es 5xx. No loguea probes ni Actuator, ni el query string.
+- `SwapiResilienceLogging`, suscripto a los eventos de Resilience4j: `INFO` por cada retry y por el éxito tras reintentar, `WARN` al agotar los intentos o si una caída no se reintenta, `WARN` al abrirse el circuito. Cada intento fallido de `SwapiRestClient` baja a `DEBUG`.
+- Seguridad: login exitoso (`INFO`, con usuario), login fallido (`WARN`, solo IP), bloqueo por rate limit (`WARN`), 401 con el motivo y 403 (`INFO`). `AuthenticatedUserFilter` pone el `sub` del token en el MDC.
+- Configuración: niveles por paquete, `service.environment` y `service.node.name` en ECS, stack traces acotados con la causa raíz primero.
+- **Tests:** unitarios del filtro de acceso, del filtro de usuario y de los eventos del circuito; ITs que verifican la secuencia retry → éxito → acceso con el mismo `requestId`, el bloqueo por rate limit y los 401/403; y que la contraseña y el token nunca aparecen en la salida.
+
 ### SOLID en esta fase
 
 - **S:** el límite de intentos vive en un componente propio (`LoginRateLimiter`), aplicado antes del controller. `AuthController` no sabe que existe.
@@ -699,6 +709,7 @@ Sección "Cómo lo escalaría" en el README, y revisión de "¿Por qué no micro
 
 - [x] Rate limiting del login con tests y su sección en el README
 - [x] Secciones de escalabilidad revisadas
+- [x] Logging de producción con ADR-018 y su sección en el README
 - [x] Tag `v1.3.0`
 
 ## 9. Fase 5 — GraphQL y MCP sobre el mismo servicio (~4-5 h, tags `v1.4.0` y `v1.5.0`)
@@ -800,6 +811,7 @@ Cada decisión tiene su archivo en [`docs/adr/`](adr/).
 | [015](adr/ADR-015.md) | Dashboard público con Grafana Cloud y scrape autenticado | Push por OTLP; Prometheus dentro de Render; dashboard solo local | Mismas métricas que en local, sin dependencias nuevas, visible desde una URL |
 | [016](adr/ADR-016.md) | GraphQL y MCP como adaptadores del mismo `CatalogService`, en el mismo deploy | Un servicio por protocolo; un gateway GraphQL aparte | Sin lógica duplicada, un deploy y una configuración de seguridad |
 | [017](adr/ADR-017.md) | Swagger UI y GraphiQL públicos en prod; los datos siguen detrás del JWT | Interfaces solo en local | El reviewer prueba REST y GraphQL desde el navegador, sin instalar nada |
+| [018](adr/ADR-018.md) | Logging de producción: un evento por decisión, línea de acceso, key-values en ECS | Loki; access log de Tomcat; `WARN` por intento; `/actuator/loggers` en prod | Diagnosticar desde la consola de Render filtrando por `requestId`, sin infraestructura nueva |
 
 ### Riesgos
 

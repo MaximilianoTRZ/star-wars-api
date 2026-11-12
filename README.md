@@ -348,8 +348,23 @@ Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics
 
 - `CorrelationIdFilter` corre primero en la cadena: reusa el `X-Request-Id` del request si es corto y alfanumérico, o genera un UUID. Lo pone en el MDC y lo devuelve en el header `X-Request-Id`.
 - El mismo ID aparece en cada línea de log del request y en el campo `requestId` de los errores, así una respuesta fallida se cruza con su log.
-- En local los logs son texto legible; en `prod` son JSON con formato ECS.
+- En local los logs son texto legible; en `prod` son JSON con formato ECS, con `requestId`, `user` y los datos de cada evento como campos.
 - Nunca se loguean contraseñas, tokens ni el header `Authorization`.
+- Cada evento se loguea una vez, donde se decide ([ADR-018](docs/adr/ADR-018.md)):
+
+| Evento | Nivel | Campos |
+| --- | --- | --- |
+| `GET /api/v1/people/{id} 200 1138ms` (una por request, sin probes ni Actuator) | `INFO`, `WARN` si es 5xx | `http.method`, `http.route`, `http.status`, `duration_ms`, `user` |
+| `SWAPI attempt 1/3 failed (CONNECTION), retrying in 200ms` | `INFO` | `swapi.attempt`, `swapi.max_attempts`, `swapi.reason`, `swapi.wait_ms` |
+| `SWAPI call succeeded on attempt 2` | `INFO` | `swapi.attempts` |
+| `SWAPI call failed after 3 attempts (SERVER_ERROR)` / `... is not retried (TIMEOUT)` | `WARN` | `swapi.attempts`, `swapi.reason` |
+| `SWAPI circuit breaker changed from CLOSED to OPEN` | `WARN` al abrir, `INFO` el resto | `circuit.from`, `circuit.to` |
+| `Login succeeded for demo` | `INFO` | `user` |
+| `Login failed from <ip>` (sin username) | `WARN` | `client.ip` |
+| `Login blocked by rate limit for <ip>, retry in 42s` | `WARN` | `client.ip`, `retry_after_s` |
+| `Request rejected as unauthenticated: <motivo>` / `Request forbidden` | `INFO` | `auth.failure` |
+
+Para seguir una request en Render: copiar el `requestId` del error (o del header `X-Request-Id`) y buscarlo en **Logs**. Para más detalle, `LOGGING_LEVEL_DEV_STARWARS=DEBUG` en las variables de entorno muestra cada intento contra SWAPI (requiere reiniciar).
 
 ## Seguridad
 
@@ -446,6 +461,7 @@ Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en códig
 | [015](docs/adr/ADR-015.md) | Dashboard público con Grafana Cloud y scrape autenticado |
 | [016](docs/adr/ADR-016.md) | GraphQL y MCP como adaptadores del mismo `CatalogService` |
 | [017](docs/adr/ADR-017.md) | Swagger UI y GraphiQL públicos en producción |
+| [018](docs/adr/ADR-018.md) | Estrategia de logging para producción |
 
 ## ¿Por qué no microservicios?
 
