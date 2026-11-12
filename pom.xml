@@ -23,6 +23,8 @@
         <argLine/>
         <archunit.version>1.5.1</archunit.version>
         <springdoc.version>3.1.0</springdoc.version>
+        <!-- resilience4j-spring-boot4 is not in the 2.4.0 BOM: explicit version -->
+        <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
         <spotless.version>3.11.0</spotless.version>
         <palantir-java-format.version>2.103.0</palantir-java-format.version>
@@ -74,6 +76,11 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>${resilience4j.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
