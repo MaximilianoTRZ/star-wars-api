@@ -23,6 +23,7 @@ El diseño, las fases de implementación y las decisiones están en el [RFC](doc
 ## Demo
 
 - **Swagger UI:** https://star-wars-api-ailb.onrender.com/swagger-ui.html
+- **Dashboard en vivo (Grafana Cloud):** https://magentaosprey3543.grafana.net/public-dashboards/c1eb26ffdec84e1fa902aa1efc509e6f
 - **API:** https://star-wars-api-ailb.onrender.com/api/v1
 - **Usuario demo:** `demo` / `6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq` (en local: `demo` / `demo123`)
 
@@ -217,9 +218,23 @@ SWAPI es gratuita, desde Render tarda entre 2 y 9 s y limita a 100 requests por 
 
 **Si SWAPI se cae:** lo que ya está en caché se sigue sirviendo. El resto responde 503 `upstream-unavailable`: primero tras los reintentos y, cuando el circuito se abre, al instante y con `Retry-After: 30`, sin llamar a SWAPI.
 
+### Prueba de carga
+
+![Prueba de carga con Postman contra Render](docs/images/postman-load-test.png)
+
+Prueba de performance de Postman contra Render: 4 usuarios virtuales durante 2 minutos, recorriendo listados, detalles y una búsqueda.
+
+- 1548 requests, 12,9 req/s y 0% de errores.
+- Latencia promedio de 298 ms, con p90 de 307 ms y p95 de 383 ms. Casi todo ese tiempo es red hasta Render: la API responde en milisegundos desde la caché (ver el p95 de 6,64 ms en el [dashboard](#dashboard)).
+- Los primeros requests tardan entre 4 y 5 s (máximos de hasta 5,5 s): son los misses que van a SWAPI. Después del primer pasaje, todo sale de la caché y la latencia queda plana.
+
 ## Observabilidad
 
 Métricas con Micrometer y Prometheus, dashboard de Grafana y logs con correlation ID. En local, `docker compose` levanta Prometheus y Grafana. En producción, Grafana Cloud lee las métricas de Render y publica el mismo dashboard ([ADR-015](docs/adr/ADR-015.md)).
+
+### Dashboard en vivo
+
+**[Abrir el dashboard público](https://magentaosprey3543.grafana.net/public-dashboards/c1eb26ffdec84e1fa902aa1efc509e6f)**: métricas reales de la app en Render, sin login. Grafana Cloud las lee cada 1 minuto; para ver movimiento, hacer algunos requests a la [demo](https://star-wars-api-ailb.onrender.com/swagger-ui.html) y refrescar.
 
 ### Levantar el stack
 
@@ -243,30 +258,75 @@ El dashboard **Star Wars API** queda como home de Grafana, sin pasos manuales: d
 
 ### Dashboard
 
-El dashboard tiene 5 filas.
+Las capturas son de Render (Grafana Cloud) durante la prueba de carga de [Resiliencia y caché](#prueba-de-carga), con la caché ya caliente. El dashboard tiene 5 filas.
 
 #### Resumen y Negocio
 
-**Resumen** muestra de un vistazo si la API está sana: requests por segundo, % de 5xx, p95, SLO de latencia (% de requests en menos de 300 ms), usuarios activos en 15 min, hit ratio de caché y estado del circuito. Con la caché fría cada miss va a SWAPI, que tarda cerca de 1 s; los hits responden en pocos ms, así que el p95 y el SLO mejoran a medida que sube el hit ratio.
+![Dashboard de Grafana: filas Resumen y Negocio](docs/images/grafana-summary-business.png)
 
-**Negocio** muestra qué consultan los usuarios: consultas por recurso, uso de filtros (`none`, `id`, `name`, `id_and_name`), top 10 entidades más vistas, % de búsquedas sin resultados, profundidad de paginación y logins exitosos contra fallidos.
+| Widget | Qué muestra |
+|---|---|
+| Requests / s | Tráfico total de la API |
+| 5xx rate | Porcentaje de respuestas 5xx: si sube, la API está fallando |
+| p95 latency | Latencia que cumple el 95% de los requests. En la captura, 6,64 ms con el 100% de hit ratio; con la caché fría cada miss va a SWAPI y tarda segundos |
+| SLO < 300 ms | Porcentaje de requests que responden en menos de 300 ms |
+| Active users | Usuarios distintos que hicieron login en los últimos 15 min. La prueba de carga reusó un token, así que marca 0 |
+| Cache hit ratio | Porcentaje de lecturas de SWAPI resueltas por la caché |
+| SWAPI circuit | Estado del circuit breaker: `CLOSED` (normal), `OPEN` (SWAPI cortada) o `HALF_OPEN` (probando) |
+| Queries by resource | Consultas por segundo a cada recurso |
+| Filter usage | Cómo se filtra: sin filtro, por `id`, por `name` o por ambos |
+| Top 10 entities | Entidades más vistas en el detalle, con el nombre que devuelve SWAPI |
+| Empty searches | Porcentaje de búsquedas por nombre que no encontraron nada, por recurso |
+| Page depth | Hasta qué página navegan (promedio y máximo por recurso) |
+| Logins | Logins exitosos y fallidos; base de la alerta de fuerza bruta |
 
 #### API
 
-Tasa de requests por endpoint, errores por status y latencia p50 / p95 / p99, total y por endpoint. Los endpoints se agrupan por URI template: `/people/1` y `/people/2` son una sola serie. `UNKNOWN` agrupa los requests rechazados antes del ruteo, como un 401 sin token.
+![Fila API](docs/images/grafana-api.png)
+
+| Widget | Qué muestra |
+|---|---|
+| Request rate by endpoint | Tráfico por endpoint, agrupado por URI template: `/people/1` y `/people/2` son una sola serie. `UNKNOWN` agrupa los requests rechazados antes del ruteo, como un 401 sin token |
+| Errors by status | Respuestas 4xx y 5xx por status. En la captura, los 404 de IDs inexistentes |
+| Latency p50 / p95 / p99 | Latencia total. Se ve el pico inicial con la caché fría (SWAPI tarda entre 4 y 5 s desde Render) y cómo cae cuando la caché se llena |
+| p95 latency by endpoint | La misma latencia, separada por endpoint |
 
 #### SWAPI y resiliencia
 
-- **SWAPI vs API (p95):** cuando la línea de la API queda debajo de la de SWAPI, la caché está absorbiendo la latencia del proveedor.
-- **Respuestas de SWAPI por status** y **Cache gets:** hits y misses de cada cache (`swapi-list`, `swapi-search`, `swapi-detail`).
-- **Retries:** llamadas a SWAPI según si necesitaron reintento y si terminaron bien.
-- **Circuit breaker:** llamadas exitosas, fallidas, ignoradas (4xx) y rechazadas con el circuito abierto, más la tasa de fallas y de llamadas lentas que usa para abrirse (50% y 80%). El panel queda vacío hasta que el circuito junta 10 llamadas.
+![Fila SWAPI y resiliencia](docs/images/grafana-swapi-resilience.png)
+
+| Widget | Qué muestra |
+|---|---|
+| SWAPI vs API latency (p95) | Latencia de SWAPI contra la de la API. Cuando la de la API queda por debajo, la caché está absorbiendo la latencia del proveedor |
+| SWAPI responses by status | Respuestas de SWAPI por status. `CLIENT_ERROR` son llamadas sin respuesta (timeout o conexión cortada) |
+| Cache gets | Hits y misses de cada cache (`swapi-list`, `swapi-search`, `swapi-detail`) |
+| Retries | Llamadas a SWAPI según si necesitaron reintento y si terminaron bien |
+| Circuit breaker calls | Llamadas exitosas, fallidas, ignoradas (4xx) y rechazadas con el circuito abierto |
+| Circuit failure rate | Tasa de fallas y de llamadas lentas sobre la ventana de 20 llamadas; el circuito abre con 50% y 80%. En la captura, 10% de fallas de SWAPI que el retry absorbió |
 
 #### JVM
 
-Heap usado, comprometido y máximo, pausas de GC y CPU del proceso y del sistema. El máximo es de unos 6 GiB porque la imagen usa `-XX:MaxRAMPercentage=75` y en local el contenedor ve toda la VM de Docker Desktop; en Render el mismo flag da unos 384 MB.
+![Fila JVM](docs/images/grafana-jvm.png)
 
-Alertas provisionadas en Prometheus: circuito abierto más de 1 min, más de 5% de 5xx en 5 min y más de 20 logins fallidos en 5 min.
+| Widget | Qué muestra |
+|---|---|
+| Heap | Memoria usada, comprometida y máxima. En Render el máximo es 384 MiB: el 75% de los 512 MB del plan (`-XX:MaxRAMPercentage=75`) |
+| GC pauses | Duración de las pausas del garbage collector |
+| CPU | Uso de CPU del proceso y del sistema |
+
+### Alertas
+
+Provisionadas en Prometheus desde [`monitoring/alerts.yml`](monitoring/alerts.yml):
+
+| Alerta | Condición |
+|---|---|
+| `SwapiCircuitOpen` | El circuito de SWAPI está abierto hace más de 1 min |
+| `HighServerErrorRate` | Más de 5% de respuestas 5xx en 5 min |
+| `FailedLoginSpike` | Más de 20 logins fallidos en 5 min |
+
+![Alertas en Prometheus con FailedLoginSpike disparada](docs/images/prometheus-alerts.png)
+
+La captura es del stack local después de una ráfaga de logins con contraseña incorrecta: `FailedLoginSpike` pasa a `FIRING` y las otras dos siguen inactivas.
 
 ### Métricas de negocio
 
@@ -356,6 +416,12 @@ curl -s "https://www.swapi.tech/api/people/1" | jq . > src/test/resources/swapi/
 - se rompe una regla de arquitectura de `ArchitectureTest`.
 
 En CI, además, cada push a `main` y cada PR se analizan en [SonarCloud](https://sonarcloud.io/summary/new_code?id=MaximilianoTRZ_star-wars-api) con el quality gate por defecto. Dependabot abre PRs semanales con las actualizaciones de Maven y de GitHub Actions.
+
+![Quality gate de SonarCloud en verde](docs/images/sonarcloud-summary.png)
+
+![Ratings de SonarCloud](docs/images/sonarcloud-overview.png)
+
+Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en código nuevo (95,7% en total), 0% de duplicación y rating A en seguridad, confiabilidad y mantenibilidad. Dependabot mantiene las dependencias al día.
 
 ## Decisiones de diseño
 
