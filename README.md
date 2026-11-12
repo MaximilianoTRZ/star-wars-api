@@ -70,7 +70,22 @@ El detalle de cada fase (work units, tests, decisiones SOLID y criterios de sali
 - **API:** https://star-wars-api-ailb.onrender.com/api/v1
 - **Usuario demo:** `demo` / `6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq` (en local: `demo` / `demo123`)
 
-Para probar desde Swagger UI: ejecutar `POST /api/v1/auth/login` con el usuario demo, copiar el `accessToken`, pegarlo en **Authorize** y llamar a cualquier endpoint del catálogo. Para GraphiQL, ver [GraphQL](#graphql).
+### Probarlo en Render
+
+**GraphQL, con todo precargado.** Este comando hace login con el usuario demo y abre GraphiQL con una query de ejemplo y el header `Authorization` ya completo; solo queda apretar ▶:
+
+```bash
+BASE=https://star-wars-api-ailb.onrender.com
+TOKEN=$(curl -s -X POST $BASE/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"6WOHUwBrXmIreNrDYxkq47Q5PuNV7mBq"}' | jq -r .accessToken)
+open "$BASE/graphiql?path=/graphql#token=$TOKEN"   # en Linux: xdg-open
+```
+
+El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía al servidor, y la página lo borra de la barra de direcciones al cargarlo. Sin terminal: abrir [GraphiQL](https://star-wars-api-ailb.onrender.com/graphiql), que ya trae la query de ejemplo, y reemplazar `<token from POST /api/v1/auth/login>` en el panel **Headers** por un token sacado de Swagger UI. Más detalle en [GraphQL](#graphql).
+
+**REST desde Swagger UI:** ejecutar `POST /api/v1/auth/login` con el usuario demo, copiar el `accessToken`, pegarlo en **Authorize** y llamar a cualquier endpoint del catálogo.
+
+**Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST y GraphQL) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
 Corre en el plan gratuito de Render, que duerme la instancia después de un rato sin tráfico: el primer request puede tardar entre 30 y 60 s. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
@@ -238,11 +253,12 @@ Los errores genéricos de HTTP (ruta inexistente, método no soportado, body ile
 
 El mismo catálogo se consulta por GraphQL en `/graphql`, con los mismos filtros, la misma paginación, la misma caché y el mismo JWT que la API REST. El controller GraphQL delega en el mismo `CatalogService` que los controllers REST y devuelve los mismos DTOs, así que no hay lógica duplicada ([ADR-016](docs/adr/ADR-016.md)). El schema está en [`schema.graphqls`](src/main/resources/graphql/schema.graphqls).
 
-**Desde GraphiQL** (https://star-wars-api-ailb.onrender.com/graphiql, o http://localhost:8080/graphiql en local):
+**Desde GraphiQL** (https://star-wars-api-ailb.onrender.com/graphiql, o http://localhost:8080/graphiql en local). La página abre con la query de abajo en el editor y el header `Authorization` en el panel **Headers**:
 
-1. Hacer login (Swagger UI o curl) y copiar el `accessToken`.
-2. En el panel **Headers** de GraphiQL pegar `{"Authorization": "Bearer <token>"}`.
-3. Ejecutar una query. El panel **Docs** muestra los tipos y los argumentos.
+1. Conseguir un token: con el comando de [Probarlo en Render](#probarlo-en-render) se abre GraphiQL con el token ya cargado; si no, hacer login en Swagger UI y pegar el `accessToken` en lugar de `<token from POST /api/v1/auth/login>`.
+2. Ejecutar la query con ▶. El panel **Docs** muestra los tipos y los argumentos de cada query.
+
+La página es la de Spring for GraphQL ([`graphiql/index.html`](src/main/resources/graphiql/index.html)), con la query de ejemplo y el header precargados.
 
 ```graphql
 {
