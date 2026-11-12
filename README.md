@@ -449,7 +449,14 @@ Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en códig
 
 ## ¿Por qué no microservicios?
 
-El dominio es uno solo: cuatro recursos de lectura que vienen del mismo proveedor, y el único estado propio son los usuarios. Separarlo en servicios agregaría latencia de red, despliegues coordinados, trazas distribuidas y fallas parciales, sin un beneficio concreto: no hay equipos distintos ni cargas que escalen distinto. Los límites entre módulos están marcados por paquetes con dependencias en una sola dirección, verificadas por ArchUnit, así que extraer uno más adelante no exige reescribir.
+El dominio es uno solo: cuatro recursos de lectura que vienen del mismo proveedor, y el único estado propio son los usuarios. Separarlo en servicios agregaría latencia de red, despliegues coordinados, trazas distribuidas y fallas parciales, sin un beneficio concreto: no hay equipos distintos ni cargas que escalen distinto. Los límites entre módulos (`auth`, `catalog`, `swapi`) están marcados por paquetes con dependencias en una sola dirección, verificadas por ArchUnit, y el cliente de SWAPI está detrás de una interfaz: extraer un módulo más adelante no exige reescribir. El [RFC](docs/RFC.md#en-un-ecosistema-de-microservicios) lista lo que se sumaría en un ecosistema de varios servicios.
+
+## Cómo lo escalaría
+
+1. **Réplicas stateless detrás de un load balancer.** La app no guarda sesión: cualquier réplica valida cualquier token. Lo que hoy vive en memoria pasa a Redis para que lo compartan todas: la caché de SWAPI (Caffeine → Redis con el mismo TTL) y el rate limiting del login (Bucket4j tiene backend para Redis; `LoginRateLimiter` es la interfaz que se reemplaza).
+2. **Identity Provider externo** (Keycloak, Auth0, Cognito). El Resource Server ya valida JWT estándar: alcanza con configurar `issuer-uri` en lugar de la clave HMAC y emitir los tokens afuera. El login y los usuarios en H2 desaparecen de la app.
+3. **Sincronizar SWAPI a una base propia** (PostgreSQL o MongoDB) con un job periódico. Los datos son casi estáticos, así que la API deja de depender de la disponibilidad y el rate limit de SWAPI, y puede paginar y filtrar con índices en lugar de en memoria.
+4. **Microservicios solo si aparece la necesidad:** equipos separados o cargas muy distintas entre auth y catálogo. En ese caso irían detrás de un API Gateway, con OpenTelemetry para las trazas y lo listado en la sección "En un ecosistema de microservicios" del RFC.
 
 ## Licencia
 
