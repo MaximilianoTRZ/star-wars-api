@@ -35,12 +35,33 @@ class ArchitectureTest {
             .allowEmptyShould(true);
 
     @ArchTest
+    static final ArchRule graphqlDoesNotAccessSwapiClientOrRepositories = noClasses()
+            .that()
+            .resideInAPackage("..graphql..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..swapi..")
+            .orShould()
+            .dependOnClassesThat()
+            .haveSimpleNameEndingWith("Repository")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule apiDoesNotDependOnGraphql = noClasses()
+            .that()
+            .resideInAPackage("..api..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAPackage("..graphql..")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule serviceDoesNotDependOnApi = noClasses()
             .that()
             .resideInAPackage("..service..")
             .should()
             .dependOnClassesThat()
-            .resideInAPackage("..api..")
+            .resideInAnyPackage("..api..", "..graphql..")
             .allowEmptyShould(true);
 
     @ArchTest

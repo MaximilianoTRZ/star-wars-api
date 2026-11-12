@@ -1,6 +1,7 @@
 package dev.starwars.support;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -34,6 +35,22 @@ public final class ApiClient {
                 .uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(json)
+                .retrieve()
+                .toEntity(String.class);
+    }
+
+    /** Posts a GraphQL query to {@code /graphql}; {@code token} may be {@code null}. */
+    public ResponseEntity<String> graphql(String query, String token) {
+        return restClient
+                .post()
+                .uri("/graphql")
+                .contentType(MediaType.APPLICATION_JSON)
+                .headers(headers -> {
+                    if (token != null) {
+                        headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                    }
+                })
+                .body(Map.of("query", query))
                 .retrieve()
                 .toEntity(String.class);
     }
