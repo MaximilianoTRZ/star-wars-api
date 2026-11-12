@@ -1,16 +1,19 @@
 package dev.starwars.common.exception;
 
+import dev.starwars.common.web.CorrelationIdFilter;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 
 /**
- * Builds API errors as {@link ProblemDetail} (RFC 9457), always with a {@code timestamp}.
+ * Builds API errors as {@link ProblemDetail} (RFC 9457), always with a {@code timestamp} and, inside a request,
+ * the {@code requestId} that also appears in the logs and the {@code X-Request-Id} header.
  *
  * <p>The only place where an error body is created, so every error has the same shape. Used by
  * {@link GlobalExceptionHandler} and by the 401/403 handlers of the security filter chain, which do not go
@@ -38,12 +41,20 @@ public class ProblemDetailFactory {
         return withTimestamp(problem);
     }
 
-    /** Adds a {@code timestamp} if the problem does not have one yet. */
+    /** Adds a {@code timestamp} and, inside a request, the current {@code requestId}, if missing. */
     public ProblemDetail withTimestamp(ProblemDetail problem) {
-        if (problem.getProperties() == null || !problem.getProperties().containsKey("timestamp")) {
+        if (!hasProperty(problem, "timestamp")) {
             problem.setProperty("timestamp", Instant.now(clock).toString());
         }
+        String requestId = MDC.get(CorrelationIdFilter.MDC_KEY);
+        if (requestId != null && !hasProperty(problem, "requestId")) {
+            problem.setProperty("requestId", requestId);
+        }
         return problem;
+    }
+
+    private static boolean hasProperty(ProblemDetail problem, String name) {
+        return problem.getProperties() != null && problem.getProperties().containsKey(name);
     }
 
     /**

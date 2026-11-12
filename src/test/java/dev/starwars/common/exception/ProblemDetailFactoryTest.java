@@ -2,12 +2,14 @@ package dev.starwars.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.starwars.common.web.CorrelationIdFilter;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 
@@ -72,5 +74,18 @@ class ProblemDetailFactoryTest {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
 
         assertThat(factory.toMap(problem)).containsEntry("type", "about:blank").doesNotContainKey("instance");
+    }
+
+    @Test
+    @DisplayName("adds the requestId of the current request")
+    void addsRequestId() {
+        MDC.put(CorrelationIdFilter.MDC_KEY, "req-123");
+        try {
+            ProblemDetail problem = factory.create(HttpStatus.NOT_FOUND, "resource-not-found", "Not found", "x");
+
+            assertThat(problem.getProperties()).containsEntry("requestId", "req-123");
+        } finally {
+            MDC.clear();
+        }
     }
 }

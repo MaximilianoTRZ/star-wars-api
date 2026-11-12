@@ -68,6 +68,11 @@ resilience4j:
         ignore-exceptions:
           - dev.starwars.swapi.SwapiClientException
 
+logging:
+  pattern:
+    # Prefixes every log line written during a request with its correlation ID.
+    correlation: "[%X{requestId:-}] "
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html

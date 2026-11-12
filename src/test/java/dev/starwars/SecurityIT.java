@@ -64,6 +64,16 @@ class SecurityIT {
     }
 
     @Test
+    @DisplayName("a 401 from the security filters carries the correlation ID in header and body")
+    void correlationIdOnSecurityError() {
+        ResponseEntity<String> response = api.get("/api/v1/people", null);
+
+        String requestId = response.getHeaders().getFirst("X-Request-Id");
+        assertThat(requestId).isNotBlank();
+        assertThat(JsonPath.<String>read(response.getBody(), "$.requestId")).isEqualTo(requestId);
+    }
+
+    @Test
     @DisplayName("a token without the catalog:read scope returns 403")
     void tokenWithoutScope() {
         String token = TestTokens.sign(TEST_SECRET, "star-wars-api", Instant.now(), Duration.ofMinutes(5), null);

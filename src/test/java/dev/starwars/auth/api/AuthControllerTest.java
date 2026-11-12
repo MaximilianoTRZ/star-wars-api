@@ -111,7 +111,7 @@ class AuthControllerTest {
     private static String withoutVolatileFields(MvcTestResult result) throws Exception {
         return result.getResponse()
                 .getContentAsString(StandardCharsets.UTF_8)
-                .replaceAll("\"timestamp\":\"[^\"]+\"", "");
+                .replaceAll("\"(timestamp|requestId)\":\"[^\"]+\"", "");
     }
 
     @Test
