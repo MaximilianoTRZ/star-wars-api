@@ -697,9 +697,9 @@ Sección "Cómo lo escalaría" en el README, y revisión de "¿Por qué no micro
 
 ### Salida de la fase
 
-- [ ] Rate limiting del login con tests y su sección en el README
-- [ ] Secciones de escalabilidad revisadas
-- [ ] Tag `v1.3.0`
+- [x] Rate limiting del login con tests y su sección en el README
+- [x] Secciones de escalabilidad revisadas
+- [x] Tag `v1.3.0`
 
 ## 9. Fase 5 — GraphQL y MCP sobre el mismo servicio (~4-5 h, tags `v1.4.0` y `v1.5.0`)
 
