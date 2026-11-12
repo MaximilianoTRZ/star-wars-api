@@ -125,4 +125,27 @@ class SecurityIT {
                 .containsKeys("type", "title", "status", "detail", "instance");
         assertThat(JsonPath.<String>read(docs, "$.info.version")).matches("\\d+\\.\\d+\\.\\d+.*");
     }
+
+    @Test
+    @DisplayName("the OpenAPI document shows and prefills the demo user of the running profile")
+    void openApiDemoCredentials() {
+        String docs = api.get("/v3/api-docs", null).getBody();
+
+        assertThat(JsonPath.<String>read(docs, "$.info.description")).contains("`demo` / `test-password`");
+        assertThat(JsonPath.<String>read(docs, "$.components.schemas.LoginRequest.properties.username.example"))
+                .isEqualTo("demo");
+        assertThat(JsonPath.<String>read(docs, "$.components.schemas.LoginRequest.properties.password.example"))
+                .isEqualTo("test-password");
+    }
+
+    @Test
+    @DisplayName("Swagger UI applies the token of a successful login to Authorize")
+    void swaggerUiAutoAuthorize() {
+        String initializer = api.get("/swagger-ui/swagger-initializer.js", null).getBody();
+
+        assertThat(initializer)
+                .contains("responseInterceptor")
+                .contains("preauthorizeApiKey('bearerAuth', response.body.accessToken)")
+                .contains("'/api/v1/auth/login'");
+    }
 }

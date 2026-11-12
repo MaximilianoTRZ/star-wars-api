@@ -51,6 +51,10 @@ app:
       username: demo
       # Local development default only. The prod profile requires DEMO_USER_PASSWORD.
       password: ${DEMO_USER_PASSWORD:demo123}
+  docs:
+    # The demo password is public (README, Postman environment), so Swagger UI shows the demo user of the running
+    # profile and prefills it in the login request. Set to false if the demo user ever gets a private password.
+    show-demo-credentials: true
 
 resilience4j:
   retry:
@@ -91,6 +95,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     persist-authorization: true
+    # Request forms open ready to Execute, without pressing "Try it out" first
+    try-it-out-enabled: true
+    display-request-duration: true
+    filter: true
 
 management:
   server:

@@ -1,5 +1,6 @@
 package dev.starwars.config;
 
+import dev.starwars.auth.security.DemoUserProperties;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,13 +29,27 @@ import org.springframework.context.annotation.Configuration;
  * <p>Declares the bearer JWT scheme (enables the Authorize button) and adds the standard
  * {@code ProblemDetail} error responses to every API operation, so controllers only document
  * their happy path.
+ *
+ * <p>With {@code app.docs.show-demo-credentials} on, the demo user's credentials of the running profile are
+ * shown in the description and prefilled in the login request, so the login works as is in every environment.
  */
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfig {
 
     static final String BEARER_SCHEME = "bearerAuth";
     static final String PROBLEM_SCHEMA = "ProblemDetail";
-    private static final String LOGIN_PATH = "/api/v1/auth/login";
+    static final String LOGIN_PATH = "/api/v1/auth/login";
+    private static final String LOGIN_SCHEMA = "LoginRequest";
+
+    private final DemoUserProperties demoUser;
+    private final boolean showDemoCredentials;
+
+    OpenApiConfig(
+            DemoUserProperties demoUser,
+            @Value("${app.docs.show-demo-credentials:false}") boolean showDemoCredentials) {
+        this.demoUser = demoUser;
+        this.showDemoCredentials = showDemoCredentials;
+    }
 
     @Bean
     OpenAPI openApi(ObjectProvider<BuildProperties> buildProperties) {
@@ -45,12 +61,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Star Wars API")
                         .version(version)
-                        .description("""
-                                People, films, starships and vehicles from [SWAPI](https://www.swapi.tech) \
-                                with uniform pagination and filters by id and/or name.
-
-                                **How to authenticate:** call `POST /api/v1/auth/login` with the demo user, \
-                                copy `accessToken` and paste it in **Authorize**.""")
+                        .description(description())
                         .license(new License().name("MIT").url("https://opensource.org/licenses/MIT")))
                 .components(new Components()
                         .addSecuritySchemes(
@@ -60,6 +71,42 @@ public class OpenApiConfig {
                                         .scheme("bearer")
                                         .bearerFormat("JWT")))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_SCHEME));
+    }
+
+    private String description() {
+        String credentials = showDemoCredentials
+                ? "**Demo user:** `%s` / `%s` (already filled in the login request body).%n%n"
+                        .formatted(demoUser.username(), demoUser.password())
+                : "";
+        return """
+                People, films, starships and vehicles from [SWAPI](https://www.swapi.tech) \
+                with uniform pagination and filters by id and/or name.
+
+                %s**How to try it:**
+                1. Open `POST /api/v1/auth/login` under **Auth** and press **Execute**.
+                2. The returned `accessToken` is applied to **Authorize** automatically \
+                (it can also be pasted there by hand).
+                3. Call any catalog endpoint. Filters: `id` and/or `name` (`title` for films), \
+                `page` starts at 1 and `size` goes from 1 to 100.
+
+                The same catalog is available over GraphQL at [/graphiql](/graphiql), with the same token \
+                in the `Authorization` header.""".formatted(credentials);
+    }
+
+    /** Prefills the login request with the demo user of the running profile. */
+    @Bean
+    OpenApiCustomizer demoLoginExampleCustomizer() {
+        return openApi -> {
+            if (!showDemoCredentials) {
+                return;
+            }
+            Schema<?> login = openApi.getComponents().getSchemas().get(LOGIN_SCHEMA);
+            if (login == null || login.getProperties() == null) {
+                return;
+            }
+            login.getProperties().get("username").example(demoUser.username());
+            login.getProperties().get("password").example(demoUser.password());
+        };
     }
 
     /**
