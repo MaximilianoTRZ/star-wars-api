@@ -14,6 +14,9 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario;
 import com.jayway.jsonpath.JsonPath;
 import dev.starwars.support.ApiClient;
 import dev.starwars.support.Fixtures;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cache.CacheManager;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -30,7 +34,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /**
- * Cache on the SWAPI client, seen through the public API.
+ * Cache, retry and circuit breaker on the SWAPI client, seen through the public API.
  * No {@code @Nested} classes: the WireMock extension would restart on a new port for each one,
  * while the Spring context keeps the first base URL.
  */
@@ -54,14 +58,22 @@ class SwapiResilienceIT {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakers;
+
     private ApiClient api;
     private String token;
 
     @BeforeEach
     void setUp() {
         cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
+        circuitBreaker().reset();
         api = new ApiClient(port);
         token = api.login("demo", "test-password");
+    }
+
+    private CircuitBreaker circuitBreaker() {
+        return circuitBreakers.circuitBreaker("swapi");
     }
 
     private ResponseEntity<String> call(String uri) {
@@ -132,5 +144,113 @@ class SwapiResilienceIT {
 
         assertThat(call("/api/v1/people/1").getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(call("/api/v1/people/1").getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("retry: 500, 500, 200 answers 200 after three requests")
+    void retriesServerErrors() {
+        String scenario = "flaky";
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario(scenario)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(500))
+                .willSetStateTo("failed once"));
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario(scenario)
+                .whenScenarioStateIs("failed once")
+                .willReturn(aResponse().withStatus(502))
+                .willSetStateTo("failed twice"));
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario(scenario)
+                .whenScenarioStateIs("failed twice")
+                .willReturn(okJson(Fixtures.swapi("people-1.json"))));
+
+        ResponseEntity<String> response = call("/api/v1/people/1");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        swapi.verify(3, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("retry: gives up after three attempts with 503")
+    void givesUpAfterThreeAttempts() {
+        swapi.stubFor(get(urlEqualTo("/api/people/1")).willReturn(aResponse().withStatus(500)));
+
+        ResponseEntity<String> response = call("/api/v1/people/1");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        swapi.verify(3, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("retry: a 429 with a short Retry-After waits that long and retries")
+    void retriesShortRetryAfter() {
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario("rate limited")
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(429).withHeader("Retry-After", "1"))
+                .willSetStateTo("allowed"));
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario("rate limited")
+                .whenScenarioStateIs("allowed")
+                .willReturn(okJson(Fixtures.swapi("people-1.json"))));
+
+        long start = System.nanoTime();
+        ResponseEntity<String> response = call("/api/v1/people/1");
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(elapsed).isGreaterThanOrEqualTo(Duration.ofSeconds(1));
+        swapi.verify(2, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("retry: a 429 with a long Retry-After is not retried and the header is passed on")
+    void longRetryAfterIsPassedOn() {
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .willReturn(aResponse().withStatus(429).withHeader("Retry-After", "60")));
+
+        ResponseEntity<String> response = call("/api/v1/people/1");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("60");
+        swapi.verify(1, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("retry: a 4xx is not retried")
+    void clientErrorNotRetried() {
+        swapi.stubFor(get(urlEqualTo("/api/people/1")).willReturn(aResponse().withStatus(400)));
+
+        assertThat(call("/api/v1/people/1").getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        swapi.verify(1, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("retry: a read timeout answers 503 without retrying")
+    void timeoutNotRetried() {
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .willReturn(okJson(Fixtures.swapi("people-1.json")).withFixedDelay(4_000)));
+
+        long start = System.nanoTime();
+        ResponseEntity<String> response = call("/api/v1/people/1");
+        Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(elapsed).isLessThan(Duration.ofSeconds(4));
+        swapi.verify(1, getRequestedFor(urlEqualTo("/api/people/1")));
+    }
+
+    @Test
+    @DisplayName("circuit breaker: a 4xx does not count as a failure")
+    void clientErrorsDoNotOpen() {
+        swapi.stubFor(
+                get(urlPathMatching("/api/people/.*")).willReturn(aResponse().withStatus(400)));
+
+        for (int i = 1; i <= 12; i++) {
+            call("/api/v1/people/" + i);
+        }
+
+        assertThat(circuitBreaker().getState()).isEqualTo(CircuitBreaker.State.CLOSED);
     }
 }

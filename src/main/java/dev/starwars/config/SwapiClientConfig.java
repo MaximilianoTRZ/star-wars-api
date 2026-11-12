@@ -1,6 +1,7 @@
 package dev.starwars.config;
 
 import dev.starwars.swapi.CachingSwapiClient;
+import dev.starwars.swapi.ResilientSwapiClient;
 import dev.starwars.swapi.SwapiClient;
 import dev.starwars.swapi.SwapiRestClient;
 import java.net.http.HttpClient;
@@ -12,8 +13,9 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Builds the {@link SwapiClient} chain: caching in front of the HTTP client, which takes the base URL and
- * timeouts from {@link SwapiProperties}. The caching decorator is the primary bean.
+ * Builds the {@link SwapiClient} chain: caching, then retry and circuit breaker, then the HTTP client with the
+ * base URL and timeouts from {@link SwapiProperties}. The caching decorator is the primary bean, so a cache hit
+ * never touches the circuit.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableCaching
@@ -25,9 +27,14 @@ public class SwapiClientConfig {
     }
 
     @Bean
+    ResilientSwapiClient resilientSwapiClient(SwapiRestClient swapiRestClient) {
+        return new ResilientSwapiClient(swapiRestClient);
+    }
+
+    @Bean
     @Primary
-    CachingSwapiClient swapiClient(SwapiRestClient swapiRestClient) {
-        return new CachingSwapiClient(swapiRestClient);
+    CachingSwapiClient swapiClient(ResilientSwapiClient resilientSwapiClient) {
+        return new CachingSwapiClient(resilientSwapiClient);
     }
 
     /**
