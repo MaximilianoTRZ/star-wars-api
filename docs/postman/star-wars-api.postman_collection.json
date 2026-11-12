@@ -1581,6 +1581,352 @@
       ]
     },
     {
+      "name": "GraphQL",
+      "description": "Same catalog through /graphql. Uses the token saved by Login. GraphQL errors return 200 with an errors array; a missing token is rejected with 401 before reaching GraphQL.",
+      "item": [
+        {
+          "name": "List people",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  people(page: 1, size: 3) {\n    content { id name }\n    page\n    size\n    totalElements\n    totalPages\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"no errors\", () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test(\"totalElements = 82\", () => pm.expect(body.data.people.totalElements).to.eql(82));",
+                  "pm.test(\"3 items\", () => pm.expect(body.data.people.content).to.have.lengthOf(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter films by title",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  films(title: \"hope\") {\n    content { id title }\n    totalElements\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"no errors\", () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test(\"A New Hope\", () => pm.expect(body.data.films.content[0].title).to.eql(\"A New Hope\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Starship and vehicle detail in one query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  starship(id: 9) { name model mglt }\n  vehicle(id: 4) { name vehicleClass }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"no errors\", () => pm.expect(body.errors).to.be.undefined);",
+                  "pm.test(\"Death Star\", () => pm.expect(body.data.starship.name).to.eql(\"Death Star\"));",
+                  "pm.test(\"Sand Crawler\", () => pm.expect(body.data.vehicle.name).to.eql(\"Sand Crawler\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown id returns NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  person(id: 9999) { name }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const error = body.errors[0];",
+                  "pm.test(\"classification NOT_FOUND\", () => pm.expect(error.extensions.classification).to.eql(\"NOT_FOUND\"));",
+                  "pm.test(\"type /problems/resource-not-found\", () => pm.expect(error.extensions.type).to.eql(\"/problems/resource-not-found\"));",
+                  "pm.test(\"requestId matches X-Request-Id\", () => pm.expect(error.extensions.requestId).to.eql(pm.response.headers.get(\"X-Request-Id\")));",
+                  "pm.test(\"person is null\", () => pm.expect(body.data.person).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Size above 100 returns BAD_REQUEST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  people(size: 500) { totalElements }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const error = body.errors[0];",
+                  "pm.test(\"classification BAD_REQUEST\", () => pm.expect(error.extensions.classification).to.eql(\"BAD_REQUEST\"));",
+                  "pm.test(\"type /problems/validation-error\", () => pm.expect(error.extensions.type).to.eql(\"/problems/validation-error\"));",
+                  "pm.test(\"requestId matches X-Request-Id\", () => pm.expect(error.extensions.requestId).to.eql(pm.response.headers.get(\"X-Request-Id\")));",
+                  "pm.test(\"violation on size\", () => pm.expect(error.extensions.errors[0].field).to.eql(\"size\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "More than 5 root fields is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  a: person(id: 1) { name }\n  b: person(id: 2) { name }\n  c: person(id: 3) { name }\n  d: person(id: 4) { name }\n  e: person(id: 5) { name }\n  f: person(id: 6) { name }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"complexity error\", () => pm.expect(body.errors[0].message).to.include(\"maximum query complexity exceeded\"));",
+                  "pm.test(\"no data\", () => pm.expect(body.data).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "No token returns 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  people { totalElements }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"type /problems/unauthorized\", () => pm.expect(pm.response.json().type).to.eql(\"/problems/unauthorized\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GraphiQL is public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphiql?path=/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphiql"
+              ],
+              "query": [
+                {
+                  "key": "path",
+                  "value": "/graphql"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"GraphiQL page\", () => pm.expect(pm.response.text().toLowerCase()).to.include(\"graphiql\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Rate limiting",
       "description": "Six logins in a row from the same client: the limit is 5 per minute, so the last one gets 429 with Retry-After. Runs last because it blocks logins for up to a minute.",
       "item": [

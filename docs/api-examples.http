@@ -36,3 +36,21 @@ Authorization: Bearer {{token}}
 
 ### Without token (401 ProblemDetail)
 GET http://localhost:8080/api/v1/people
+
+### GraphQL: people page and a film detail in one request
+POST http://localhost:8080/graphql
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "query": "{ people(name: \"skywalker\") { content { id name } totalElements } film(id: 1) { title episodeId director } }"
+}
+
+### GraphQL: unknown id (null with a NOT_FOUND error)
+POST http://localhost:8080/graphql
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "query": "{ person(id: 9999) { name } }"
+}

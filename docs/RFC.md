@@ -719,19 +719,20 @@ Objetivo: sumar una forma nueva de consumir el mismo catálogo sin duplicar lóg
 
 ```
 REST controllers ──┐
-GraphQL resolvers ─┼──▶ CatalogService ──▶ SwapiClient (caché + resiliencia)
+GraphQL controller ┼──▶ CatalogService ──▶ SwapiClient (caché + resiliencia)
 MCP tools (F6) ────┘
 ```
 
 ### Deploy
 
 - Mismo jar, misma imagen Docker y mismo servicio de Render. Solo aparecen `/graphql` y `/graphiql` en el mismo puerto. No hay infraestructura ni variables de entorno nuevas.
-- Costo: una dependencia más hace más lento el arranque en el plan free (0,1 CPU, 512 MB). Al cerrar la fase se miden el tiempo de arranque y la memoria, y se anotan en el README.
+- Costo: una dependencia más hace más lento el arranque en el plan free (0,1 CPU, 512 MB). Al cerrar la fase se revisan en Render el tiempo de arranque y la memoria.
 
-### WU 5.1 — GraphQL
+### WU 5.1 — Queries, schema y seguridad
 
 - Spring for GraphQL en `/graphql`, protegido con el mismo JWT y el scope `catalog:read`.
-- Los resolvers (`@QueryMapping`) delegan en `CatalogService`: cero lógica duplicada.
+- `CatalogGraphQlController` (`@QueryMapping`) delega en `CatalogService` y devuelve los mismos DTOs que REST: cero lógica duplicada y la misma forma en los dos canales.
+- Las reglas de entrada (`ID_PATTERN`, `MAX_FILTER_LENGTH`) pasan a `catalog/domain/CatalogConstraints`, compartidas por REST y GraphQL. Los argumentos se validan con Bean Validation, igual que los `@RequestParam`.
 
 ```graphql
 type Query {
@@ -745,16 +746,34 @@ type Query {
 type PersonPage { content: [PersonSummary!]!, page: Int!, size: Int!, totalElements: Int!, totalPages: Int! }
 ```
 
-- Errores mapeados con `DataFetcherExceptionResolver` a los mismos códigos de negocio que la API REST (`NOT_FOUND`, `BAD_REQUEST`, `UNAVAILABLE`), con el `requestId` en las extensiones.
-- **GraphiQL público en todos los perfiles, incluido `prod`**, en `/graphiql` (ADR-017). La página carga sin token, igual que Swagger UI; cada query a `/graphql` exige el JWT, que se pega en el panel de headers (`{"Authorization": "Bearer <token>"}`). `SecurityConfig` suma `/graphiql` y sus assets a las rutas públicas.
-- Métricas: `catalog.queries` suma el tag `channel` (`rest`, `graphql`; `mcp` en la Fase 6), un conjunto acotado.
-- **Tests:** `@GraphQlTest` en slice para resolvers y errores; `HttpGraphQlTester` en un IT con JWT y WireMock; `/graphiql` carga sin token y `/graphql` sin token devuelve 401.
-- README: cómo usar GraphiQL en Render, una query de ejemplo y el curl con el token.
+- **GraphiQL público en todos los perfiles, incluido `prod`**, en `/graphiql` (ADR-017). La página carga sin token, igual que Swagger UI; cada query a `/graphql` exige el JWT, que se pega en el panel de headers (`{"Authorization": "Bearer <token>"}`).
+- ArchUnit: `graphql` no usa `swapi` ni repositorios, `service` no depende de `graphql` y `api` no depende de `graphql`.
+- **Tests:** `@GraphQlTest` con `CatalogService` mockeado; `GraphQlIT` de punta a punta con JWT y WireMock; `/graphiql` carga sin token, `/graphql` sin token → 401 y sin scope → 403.
+
+### WU 5.2 — Errores y correlación
+
+- `GraphQlExceptionResolver` (en `common/exception`, al lado de `GlobalExceptionHandler`, para que `catalog/graphql` no conozca las excepciones de `swapi`) traduce a `NOT_FOUND`, `BAD_REQUEST` (con `errors: [{field, message}]`), `UNAVAILABLE` (con `retryAfter`), `BAD_GATEWAY` e `INTERNAL_ERROR`. En `extensions` van el mismo `type` que el `ProblemDetail` de REST, `timestamp` y `requestId`.
+- Con virtual threads, Boot ejecuta los controllers GraphQL en otro executor. Spring for GraphQL propaga el contexto de seguridad, pero no el MDC: `ContextPropagationConfig` registra un `Slf4jThreadLocalAccessor` (context-propagation) para `requestId`, `user` y `channel`, así los logs de SWAPI y los errores de una query llevan el mismo `requestId` que el header `X-Request-Id`.
+- El cálculo del `Retry-After` con el circuito abierto se extrae a `CircuitRetryAfter`, compartido por los dos handlers.
+- **Tests:** un caso por clasificación en el slice; IT con SWAPI devolviendo 404 y 500 que verifica `type`, `requestId` igual al header y la misma ID en los logs de reintentos y de acceso.
+
+### WU 5.3 — Métricas por canal y límite de consultas
+
+- `catalog.queries` suma el tag `channel` (`rest`, `graphql`; `mcp` en la Fase 6), un conjunto acotado. `GraphQlChannelFilter` pone el canal en el MDC para `/graphql`; `CatalogMetrics` lo lee de ahí (REST por defecto), sin tocar `CatalogService`. El canal también queda en los logs.
+- El panel "Queries by resource" del dashboard pasa a agrupar por recurso y canal.
+- **Límite de campos raíz:** como máximo 5 por query, alias incluidos (`MaxQueryComplexityInstrumentation` con costo 1 por campo raíz). Cada campo raíz puede ser una llamada a SWAPI (rate limit de 100 por IP); la query se rechaza antes de ejecutarse. No se limita la profundidad: el schema no es recursivo y la introspección de GraphiQL es profunda.
+- **Tests:** tag por canal en `CatalogMetricsTest`; IT que verifica `channel="graphql"` y `channel="rest"` en el `MeterRegistry` y que una query con 6 campos raíz no llama a SWAPI.
+
+### WU 5.4 — Documentación, Postman y medición
+
+- README: sección "GraphQL" (GraphiQL en Render, query de ejemplo, curl, tabla de errores), link en Demo, seguridad, arquitectura, tests y métricas.
+- Postman: carpeta "GraphQL" (listado, filtro, detalle, `NOT_FOUND`, `BAD_REQUEST`, límite de campos raíz, 401 y GraphiQL público). `docs/api-examples.http` con dos requests GraphQL.
+- Tiempo de arranque y memoria: se verifican en Render después del deploy (log de arranque y heap del dashboard). Simular 0,1 CPU con Docker en local da tiempos mucho peores que los de Render, así que no sirve como referencia.
 
 ### SOLID en esta fase
 
 - **O:** un canal nuevo sin modificar `CatalogService`, `SwapiClient` ni los controllers REST.
-- **S:** los resolvers solo traducen entre GraphQL y `CatalogService`; el mapeo de errores vive en su propio `DataFetcherExceptionResolver`.
+- **S:** el controller GraphQL solo traduce entre GraphQL y `CatalogService`; el mapeo de errores vive en su propio `DataFetcherExceptionResolver`, el canal en un filtro y el límite de consultas en una instrumentación.
 - **D:** el adaptador depende del servicio de aplicación, no de SWAPI ni de los controllers REST.
 
 ### Cierre de la fase
@@ -767,7 +786,7 @@ type PersonPage { content: [PersonSummary!]!, page: Int!, size: Int!, totalEleme
 - [ ] `/graphql` funcionando en la URL de Render, protegido con JWT
 - [ ] GraphiQL (`/graphiql`) accesible en la URL de Render, junto a Swagger UI (`/swagger-ui.html`)
 - [ ] Tests del adaptador GraphQL en verde
-- [ ] Tiempo de arranque y memoria medidos y anotados en el README
+- [ ] Arranque y memoria revisados en Render
 - [ ] Tag `v1.4.0`
 
 ## 10. Fase 6 — Servidor MCP (~2-3 h, tag `v1.5.0`)
