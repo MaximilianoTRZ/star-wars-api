@@ -87,7 +87,7 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST y GraphQL) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
-Corre en el plan gratuito de Render, que duerme la instancia después de un rato sin tráfico: el primer request puede tardar entre 30 y 60 s. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
+Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 170 s en arrancar (medido en el deploy de la Fase 5), así que si la instancia está dormida el primer request puede tardar unos 3 minutos. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
 ## Quick start
 
