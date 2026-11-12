@@ -397,7 +397,7 @@ Un único formato de error para toda la API, incluidos los 401 y 403 de la caden
 | Excepción | Status | `type` |
 | --- | --- | --- |
 | `MethodArgumentNotValidException`, `HandlerMethodValidationException` | 400 | `/problems/validation-error` (con `errors: [{field, message}]`) |
-| `MethodArgumentTypeMismatchException`, body ilegible y demás 4xx de Spring MVC | 400 / 404 / 405 | Los genera `ResponseEntityExceptionHandler` |
+| `MethodArgumentTypeMismatchException`, body ilegible y demás 4xx de Spring MVC | 400 / 404 / 405 | `about:blank` (RFC 9457 §4.2.1): no agregan semántica al status. Los genera `ResponseEntityExceptionHandler` con un `detail` sin internos de Spring |
 | `AuthenticationException` (login fallido) | 401 | `/problems/invalid-credentials` |
 | `ResourceNotFoundException` | 404 | `/problems/resource-not-found` |
 | `SwapiClientException` | 502 | `/problems/upstream-error` |

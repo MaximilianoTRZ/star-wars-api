@@ -1,6 +1,5 @@
 package dev.starwars.common.exception;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -24,6 +22,8 @@ import org.springframework.test.web.servlet.ResultActions;
 @WebMvcTest(ErrorTestController.class)
 @Import({GlobalExceptionHandler.class, ProblemDetailFactory.class, ClockConfig.class})
 class GlobalExceptionHandlerTest {
+
+    private static final String ABOUT_BLANK = "about:blank";
 
     @Autowired
     private MockMvc mvc;
@@ -34,7 +34,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.status").value(status))
                 .andExpect(jsonPath("$.instance").value(instance))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
-                .andExpect(jsonPath("$.type").value("/problems/" + type));
+                .andExpect(jsonPath("$.type").value(type.equals(ABOUT_BLANK) ? type : "/problems/" + type));
     }
 
     @Test
@@ -108,7 +108,7 @@ class GlobalExceptionHandlerTest {
     void typeMismatch() throws Exception {
         var result = mvc.perform(get("/test/errors/param").param("size", "abc"));
 
-        assertProblem(result, 400, "bad-request", "/test/errors/param");
+        assertProblem(result, 400, ABOUT_BLANK, "/test/errors/param");
         result.andExpect(jsonPath("$.detail").value("Parameter 'size' has an invalid value."));
     }
 
@@ -120,7 +120,7 @@ class GlobalExceptionHandlerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{ not json")),
                 400,
-                "bad-request",
+                ABOUT_BLANK,
                 "/test/errors/body");
     }
 
@@ -129,7 +129,7 @@ class GlobalExceptionHandlerTest {
     void unknownRoute() throws Exception {
         var result = mvc.perform(get("/test/errors/nope"));
 
-        assertProblem(result, 404, "not-found", "/test/errors/nope");
+        assertProblem(result, 404, ABOUT_BLANK, "/test/errors/nope");
         result.andExpect(jsonPath("$.title").value("Not Found"))
                 .andExpect(jsonPath("$.detail").value("No endpoint matches this path."))
                 .andExpect(content().string(not(containsString("static resource"))));
@@ -138,12 +138,6 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("an unsupported method is 405 from Spring MVC")
     void methodNotAllowed() throws Exception {
-        assertProblem(mvc.perform(post("/test/errors/not-found")), 405, "method-not-allowed", "/test/errors/not-found");
-    }
-
-    @Test
-    @DisplayName("an unknown status maps to an http-<code> type")
-    void typeForUnknownStatus() {
-        assertThat(GlobalExceptionHandler.typeFor(HttpStatusCode.valueOf(499))).isEqualTo("http-499");
+        assertProblem(mvc.perform(post("/test/errors/not-found")), 405, ABOUT_BLANK, "/test/errors/not-found");
     }
 }

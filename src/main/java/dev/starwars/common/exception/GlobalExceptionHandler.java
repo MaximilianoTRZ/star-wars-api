@@ -6,7 +6,6 @@ import dev.starwars.swapi.UpstreamUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,9 +115,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
-     * Every response built by the base class goes through here. Spring MVC errors get the same shape as the
-     * rest: an explicit {@code type} derived from the status, a {@code timestamp}, an {@code instance} and a
-     * {@code detail} that does not reveal framework internals.
+     * Every response built by the base class goes through here. Spring MVC errors carry no meaning beyond their
+     * status, so they get an explicit {@code about:blank} type (RFC 9457, section 4.2.1), a {@code timestamp},
+     * an {@code instance} and a {@code detail} that does not reveal framework internals.
      */
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
@@ -129,8 +128,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             body = errorResponse.getBody();
         }
         if (body instanceof ProblemDetail problem) {
-            if (problem.getType() == null || ABOUT_BLANK.equals(problem.getType())) {
-                problem.setType(URI.create("/problems/" + typeFor(statusCode)));
+            if (problem.getType() == null) {
+                problem.setType(ABOUT_BLANK);
             }
             publicDetail(ex).ifPresent(problem::setDetail);
             problems.withTimestamp(problem);
@@ -139,14 +138,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             }
         }
         return super.handleExceptionInternal(ex, body, headers, statusCode, request);
-    }
-
-    /** {@code 404} → {@code not-found}, {@code 405} → {@code method-not-allowed}. */
-    static String typeFor(HttpStatusCode status) {
-        HttpStatus known = HttpStatus.resolve(status.value());
-        return known == null
-                ? "http-" + status.value()
-                : known.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     /** Replaces Spring messages that mention internals (static resources, type conversion). */
