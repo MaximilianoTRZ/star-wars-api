@@ -133,7 +133,7 @@ curl -s "$BASE/api/v1/starships/9" -H "Authorization: Bearer $TOKEN"
 
 El mismo flujo está disponible como:
 
-- **Colección de Postman** en [`docs/postman/`](docs/postman/): 40 requests con 131 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
+- **Colección de Postman** en [`docs/postman/`](docs/postman/): 46 requests con 139 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). La carpeta "Rate limiting" va al final porque bloquea los logins durante hasta un minuto. Por línea de comandos:
   ```bash
   npx newman run docs/postman/star-wars-api.postman_collection.json \
     -e docs/postman/local.postman_environment.json --delay-request 500
@@ -184,6 +184,7 @@ El campo `type` identifica el problema. Los de la API son:
 | 401 | `/problems/invalid-credentials` | Login con usuario o contraseña incorrectos (mismo mensaje en ambos casos) |
 | 403 | `/problems/forbidden` | El token no tiene el scope `catalog:read` |
 | 404 | `/problems/resource-not-found` | El ID no existe en SWAPI |
+| 429 | `/problems/too-many-requests` | Más de 5 intentos de login por minuto desde la misma IP; incluye `Retry-After` |
 | 500 | `/problems/internal-error` | Error inesperado; la respuesta no expone detalles internos |
 | 502 | `/problems/upstream-error` | SWAPI respondió algo que no se puede interpretar |
 | 503 | `/problems/upstream-unavailable` | SWAPI caída, lenta (timeout de 10 s), con rate limit o con el circuito abierto; incluye `Retry-After` cuando se conoce |
@@ -357,6 +358,7 @@ Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics
 - **Autorización:** los endpoints del catálogo exigen el scope `catalog:read`; estar autenticado no alcanza.
 - **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI y los probes `/livez` y `/readyz`. Cualquier otra ruta sin token responde 401.
 - **Métricas:** en local Actuator vive en el puerto de management (8081), que no se publica. En Render comparte el puerto público y `/actuator/prometheus` exige HTTP Basic con un usuario propio, que no sirve para llamar a la API ([ADR-015](docs/adr/ADR-015.md)).
+- **Rate limiting del login:** 5 intentos por minuto por IP (Bucket4j). El 6º responde 429 con `Retry-After` antes de verificar las credenciales, y cuenta como `auth.login.attempts{result="blocked"}`. En Render la IP sale de `X-Forwarded-For`; en local ese header se ignora para que no se pueda falsear. Los buckets viven en memoria y vencen a los 10 min sin uso: con varias réplicas el límite no se comparte (ver [Cómo lo escalaría](#cómo-lo-escalaría)).
 - **CSRF deshabilitado:** la API es stateless y no usa cookies. El token viaja en el header `Authorization`, que el navegador no envía por su cuenta, así que no hay superficie para CSRF.
 - **Fail fast:** en `prod` la app no arranca sin `JWT_SECRET` (mínimo 32 bytes), `DEMO_USER_PASSWORD` ni `METRICS_PASSWORD` (mínimo 16 caracteres).
 - **Swagger UI público en producción** ([ADR-017](docs/adr/ADR-017.md)): la página carga sin token, pero cada llamada al catálogo lo exige.
