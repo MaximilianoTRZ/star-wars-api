@@ -523,8 +523,8 @@
     {
       "type": "timeseries",
       "id": 10,
-      "title": "Queries by resource",
-      "description": "",
+      "title": "Queries by resource and channel",
+      "description": "Catalog listings per second, split by resource and by channel (REST or GraphQL).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -541,9 +541,9 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (resource) (rate(catalog_queries_total[$__rate_interval]))",
+          "expr": "sum by (resource, channel) (rate(catalog_queries_total[$__rate_interval]))",
           "refId": "A",
-          "legendFormat": "{{resource}}"
+          "legendFormat": "{{resource}} · {{channel}}"
         }
       ],
       "options": {

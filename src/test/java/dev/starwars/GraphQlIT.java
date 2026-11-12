@@ -1,6 +1,8 @@
 package dev.starwars;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
@@ -13,6 +15,7 @@ import dev.starwars.support.ApiClient;
 import dev.starwars.support.Fixtures;
 import dev.starwars.support.TestTokens;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -60,6 +63,9 @@ class GraphQlIT {
 
     @Autowired
     private CircuitBreakerRegistry circuitBreakers;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     private ApiClient api;
 
@@ -121,6 +127,43 @@ class GraphQlIT {
         assertThat(output)
                 .containsPattern("\\[" + downId + "] .*SWAPI attempt 1/3 failed")
                 .containsPattern("\\[" + downId + "] .*POST /graphql 200");
+    }
+
+    @Test
+    @DisplayName("catalog.queries counts GraphQL and REST queries under their own channel")
+    void metricsByChannel() {
+        swapi.stubFor(get(urlEqualTo("/api/people?name=skywalker"))
+                .willReturn(okJson(Fixtures.swapi("people-search-skywalker.json"))));
+        String token = api.login("demo", "test-password");
+        double graphqlBefore = queries("graphql");
+        double restBefore = queries("rest");
+
+        api.graphql(PEOPLE_QUERY, token);
+        api.get("/api/v1/people?name=skywalker", token);
+
+        assertThat(queries("graphql")).isEqualTo(graphqlBefore + 1);
+        assertThat(queries("rest")).isEqualTo(restBefore + 1);
+    }
+
+    @Test
+    @DisplayName("a query with more root fields than allowed is rejected before calling SWAPI")
+    void rootFieldLimit() {
+        String token = api.login("demo", "test-password");
+        String query = "{ a: person(id: 1) { name } b: person(id: 2) { name } c: person(id: 3) { name } "
+                + "d: person(id: 4) { name } e: person(id: 5) { name } f: person(id: 6) { name } }";
+
+        ResponseEntity<String> response = api.graphql(query, token);
+
+        assertThat(JsonPath.<String>read(response.getBody(), "$.errors[0].message"))
+                .contains("maximum query complexity exceeded");
+        assertThat(response.getBody()).doesNotContain("\"data\":{");
+        swapi.verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    private double queries(String channel) {
+        return meterRegistry.find("catalog.queries").tag("channel", channel).counters().stream()
+                .mapToDouble(counter -> counter.count())
+                .sum();
     }
 
     @Test
