@@ -1,0 +1,8 @@
+# Production profile: no defaults for secrets.
+# The app fails to start if JWT_SECRET or DEMO_USER_PASSWORD is missing.
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}
+    demo-user:
+      password: ${DEMO_USER_PASSWORD}
