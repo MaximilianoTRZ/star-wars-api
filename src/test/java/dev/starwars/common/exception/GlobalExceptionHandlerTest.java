@@ -1,4 +1,4 @@
-package dev.starwars.shared.error;
+package dev.starwars.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;

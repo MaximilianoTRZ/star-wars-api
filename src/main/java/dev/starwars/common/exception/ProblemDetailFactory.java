@@ -1,4 +1,4 @@
-package dev.starwars.shared.error;
+package dev.starwars.common.exception;
 
 import java.net.URI;
 import java.time.Clock;

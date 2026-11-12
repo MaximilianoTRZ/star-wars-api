@@ -1,4 +1,4 @@
-package dev.starwars.shared.error;
+package dev.starwars.common.exception;
 
 import dev.starwars.catalog.domain.CatalogResource;
 import dev.starwars.catalog.domain.ResourceNotFoundException;

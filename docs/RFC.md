@@ -92,8 +92,8 @@ dev.starwars
 │   ├── service/     CatalogService, Paginator, CatalogMetrics
 │   └── domain/      CatalogItem, SearchCriteria, PageRequestParams, PageResponse
 ├── swapi/           SwapiClient y sus decorators, ResourceType, modelos de SWAPI, excepciones
-└── shared/
-    ├── error/       GlobalExceptionHandler, ProblemDetailFactory
+└── common/
+    ├── exception/   GlobalExceptionHandler, ProblemDetailFactory
     └── web/         CorrelationIdFilter
 ```
 
@@ -391,7 +391,7 @@ Reglas:
 
 Un único formato de error para toda la API, incluidos los 401 y 403 de la cadena de seguridad (ADR-013). Va antes que la seguridad y los controllers, que lo usan.
 
-- `ProblemDetailFactory` (`shared/error`) es el único lugar donde se arma un error: `type` con la forma `/problems/{nombre}`, `title`, `status`, `detail`, `instance` y `timestamp`.
+- `ProblemDetailFactory` (`common/exception`) es el único lugar donde se arma un error: `type` con la forma `/problems/{nombre}`, `title`, `status`, `detail`, `instance` y `timestamp`.
 - `GlobalExceptionHandler` (`@RestControllerAdvice`) extiende `ResponseEntityExceptionHandler`, así los errores propios de Spring MVC ya salen en este formato.
 
 | Excepción | Status | `type` |
