@@ -41,8 +41,10 @@ public class SecurityConfig {
             HttpSecurity http,
             ProblemDetailAuthenticationEntryPoint authenticationEntryPoint,
             ProblemDetailAccessDeniedHandler accessDeniedHandler) {
-        http.csrf(AbstractHttpConfigurer::disable)
-                .httpBasic(AbstractHttpConfigurer::disable)
+        // CSRF needs credentials that the browser attaches on its own (cookies). This API is stateless and the
+        // token travels in the Authorization header, which browsers never send by themselves.
+        http.csrf(AbstractHttpConfigurer::disable); // NOSONAR java:S4502 - no cookies, see comment above
+        http.httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
