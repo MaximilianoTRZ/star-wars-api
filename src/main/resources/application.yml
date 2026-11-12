@@ -8,6 +8,12 @@ spring:
     url: jdbc:h2:mem:starwars;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
+  cache:
+    # Declared up front so their metrics are registered at startup
+    cache-names: swapi-list,swapi-search,swapi-detail
+    caffeine:
+      # SWAPI data is practically static
+      spec: maximumSize=1000,expireAfterWrite=1h,recordStats
   jpa:
     open-in-view: false
     hibernate:

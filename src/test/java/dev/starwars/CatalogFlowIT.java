@@ -20,8 +20,10 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -45,6 +47,9 @@ class CatalogFlowIT {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     private ApiClient api;
     private String token;
@@ -128,6 +133,7 @@ class CatalogFlowIT {
 
     @BeforeEach
     void login() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
         api = new ApiClient(port);
         token = api.login("demo", "test-password");
     }
