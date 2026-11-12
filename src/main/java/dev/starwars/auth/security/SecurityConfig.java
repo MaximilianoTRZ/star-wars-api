@@ -1,5 +1,6 @@
 package dev.starwars.auth.security;
 
+import dev.starwars.auth.service.AuthMetrics;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -36,11 +38,12 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li><b>Stateless:</b> no HTTP session. CSRF is disabled because there are no cookies: the token travels
  *       in the {@code Authorization} header, which browsers never send on their own.</li>
  *   <li><b>Errors:</b> 401 and 403 return {@code ProblemDetail}, like the rest of the API.</li>
+ *   <li><b>Logs:</b> the token's user goes to the MDC ({@link AuthenticatedUserFilter}).</li>
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties(MetricsScrapeProperties.class)
+@EnableConfigurationProperties({MetricsScrapeProperties.class, LoginRateLimitProperties.class})
 public class SecurityConfig {
 
     /** Scope issued by login and required by the catalog endpoints. */
@@ -119,8 +122,16 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler));
+                        .accessDeniedHandler(accessDeniedHandler))
+                .addFilterAfter(new AuthenticatedUserFilter(), BearerTokenAuthenticationFilter.class);
         return http.build();
+    }
+
+    /** Rate limit on login, applied as a servlet filter before the security chain. */
+    @Bean
+    LoginRateLimitFilter loginRateLimitFilter(
+            LoginRateLimiter limiter, ProblemDetailResponseWriter writer, AuthMetrics metrics) {
+        return new LoginRateLimitFilter(limiter, writer, metrics);
     }
 
     /**

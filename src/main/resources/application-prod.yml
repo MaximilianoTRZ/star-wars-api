@@ -18,8 +18,23 @@ management:
   server:
     port: ${server.port:8080}
 
-# JSON logs (Elastic Common Schema); the MDC requestId is included as a field.
+# JSON logs (Elastic Common Schema, ADR-018). MDC values (requestId, user) and the key-values of each event
+# (http.*, swapi.*, client.ip) are included as fields.
 logging:
   structured:
     format:
       console: ecs
+    ecs:
+      service:
+        environment: ${APP_ENV:prod}
+        # Set by Render; identifies the instance when there is more than one
+        node-name: ${RENDER_INSTANCE_ID:}
+    json:
+      stacktrace:
+        # Root cause first and a bounded size, so one error does not flood the Render log view
+        root: first
+        max-length: 8192
+
+# Behind Render's proxy: the client IP (used by the login rate limit) comes from X-Forwarded-For.
+server:
+  forward-headers-strategy: framework

@@ -133,7 +133,7 @@ curl -s "$BASE/api/v1/starships/9" -H "Authorization: Bearer $TOKEN"
 
 El mismo flujo está disponible como:
 
-- **Colección de Postman** en [`docs/postman/`](docs/postman/): 40 requests con 131 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). Por línea de comandos:
+- **Colección de Postman** en [`docs/postman/`](docs/postman/): 46 requests con 139 aserciones y dos entornos, `local` y `render`. Se importan la colección y un entorno y se corre con el *Collection Runner*: el login guarda el token para el resto. Como pega contra SWAPI real, que tiene rate limit, conviene dejar una pausa entre requests (*Delay* en el runner). La carpeta "Rate limiting" va al final porque bloquea los logins durante hasta un minuto. Por línea de comandos:
   ```bash
   npx newman run docs/postman/star-wars-api.postman_collection.json \
     -e docs/postman/local.postman_environment.json --delay-request 500
@@ -184,6 +184,7 @@ El campo `type` identifica el problema. Los de la API son:
 | 401 | `/problems/invalid-credentials` | Login con usuario o contraseña incorrectos (mismo mensaje en ambos casos) |
 | 403 | `/problems/forbidden` | El token no tiene el scope `catalog:read` |
 | 404 | `/problems/resource-not-found` | El ID no existe en SWAPI |
+| 429 | `/problems/too-many-requests` | Más de 5 intentos de login por minuto desde la misma IP; incluye `Retry-After` |
 | 500 | `/problems/internal-error` | Error inesperado; la respuesta no expone detalles internos |
 | 502 | `/problems/upstream-error` | SWAPI respondió algo que no se puede interpretar |
 | 503 | `/problems/upstream-unavailable` | SWAPI caída, lenta (timeout de 10 s), con rate limit o con el circuito abierto; incluye `Retry-After` cuando se conoce |
@@ -322,7 +323,7 @@ Provisionadas en Prometheus desde [`monitoring/alerts.yml`](monitoring/alerts.ym
 |---|---|
 | `SwapiCircuitOpen` | El circuito de SWAPI está abierto hace más de 1 min |
 | `HighServerErrorRate` | Más de 5% de respuestas 5xx en 5 min |
-| `FailedLoginSpike` | Más de 20 logins fallidos en 5 min |
+| `FailedLoginSpike` | Más de 20 logins fallidos o bloqueados por rate limiting en 5 min |
 
 ![Alertas en Prometheus con FailedLoginSpike disparada](docs/images/prometheus-alerts.png)
 
@@ -336,7 +337,7 @@ La captura es del stack local después de una ráfaga de logins con contraseña 
 | `catalog.entity.views` | Counter | `resource`, `entity` | ¿Qué entidades son las más consultadas? |
 | `catalog.searches.empty` | Counter | `resource` | ¿Qué porcentaje de búsquedas no encuentra nada? |
 | `catalog.page.requested` | DistributionSummary | `resource` | ¿Hasta qué página navegan? |
-| `auth.login.attempts` | Counter | `result` (`success`, `failure`) | ¿Hay intentos de fuerza bruta? |
+| `auth.login.attempts` | Counter | `result` (`success`, `failure`, `blocked`) | ¿Hay intentos de fuerza bruta? |
 | `auth.active.users` | Gauge | — | ¿Cuántos usuarios distintos hubo en 15 min? |
 
 Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics` y `AuthMetrics`; los controllers no conocen Micrometer.
@@ -347,8 +348,23 @@ Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics
 
 - `CorrelationIdFilter` corre primero en la cadena: reusa el `X-Request-Id` del request si es corto y alfanumérico, o genera un UUID. Lo pone en el MDC y lo devuelve en el header `X-Request-Id`.
 - El mismo ID aparece en cada línea de log del request y en el campo `requestId` de los errores, así una respuesta fallida se cruza con su log.
-- En local los logs son texto legible; en `prod` son JSON con formato ECS.
+- En local los logs son texto legible; en `prod` son JSON con formato ECS, con `requestId`, `user` y los datos de cada evento como campos.
 - Nunca se loguean contraseñas, tokens ni el header `Authorization`.
+- Cada evento se loguea una vez, donde se decide ([ADR-018](docs/adr/ADR-018.md)):
+
+| Evento | Nivel | Campos |
+| --- | --- | --- |
+| `GET /api/v1/people/{id} 200 1138ms` (una por request, sin probes ni Actuator) | `INFO`, `WARN` si es 5xx | `http.method`, `http.route`, `http.status`, `duration_ms`, `user` |
+| `SWAPI attempt 1/3 failed (CONNECTION), retrying in 200ms` | `INFO` | `swapi.attempt`, `swapi.max_attempts`, `swapi.reason`, `swapi.wait_ms` |
+| `SWAPI call succeeded on attempt 2` | `INFO` | `swapi.attempts` |
+| `SWAPI call failed after 3 attempts (SERVER_ERROR)` / `... is not retried (TIMEOUT)` | `WARN` | `swapi.attempts`, `swapi.reason` |
+| `SWAPI circuit breaker changed from CLOSED to OPEN` | `WARN` al abrir, `INFO` el resto | `circuit.from`, `circuit.to` |
+| `Login succeeded for demo` | `INFO` | `user` |
+| `Login failed from <ip>` (sin username) | `WARN` | `client.ip` |
+| `Login blocked by rate limit for <ip>, retry in 42s` | `WARN` | `client.ip`, `retry_after_s` |
+| `Request rejected as unauthenticated: <motivo>` / `Request forbidden` | `INFO` | `auth.failure` |
+
+Para seguir una request en Render: copiar el `requestId` del error (o del header `X-Request-Id`) y buscarlo en **Logs**. Para más detalle, `LOGGING_LEVEL_DEV_STARWARS=DEBUG` en las variables de entorno muestra cada intento contra SWAPI (requiere reiniciar).
 
 ## Seguridad
 
@@ -357,6 +373,7 @@ Se registran en `CatalogService` y `AuthController` a través de `CatalogMetrics
 - **Autorización:** los endpoints del catálogo exigen el scope `catalog:read`; estar autenticado no alcanza.
 - **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI y los probes `/livez` y `/readyz`. Cualquier otra ruta sin token responde 401.
 - **Métricas:** en local Actuator vive en el puerto de management (8081), que no se publica. En Render comparte el puerto público y `/actuator/prometheus` exige HTTP Basic con un usuario propio, que no sirve para llamar a la API ([ADR-015](docs/adr/ADR-015.md)).
+- **Rate limiting del login:** 5 intentos por minuto por IP (Bucket4j). El 6º responde 429 con `Retry-After` antes de verificar las credenciales, y cuenta como `auth.login.attempts{result="blocked"}`. En Render la IP sale de `X-Forwarded-For`; en local ese header se ignora para que no se pueda falsear. Los buckets viven en memoria y vencen a los 10 min sin uso: con varias réplicas el límite no se comparte (ver [Cómo lo escalaría](#cómo-lo-escalaría)).
 - **CSRF deshabilitado:** la API es stateless y no usa cookies. El token viaja en el header `Authorization`, que el navegador no envía por su cuenta, así que no hay superficie para CSRF.
 - **Fail fast:** en `prod` la app no arranca sin `JWT_SECRET` (mínimo 32 bytes), `DEMO_USER_PASSWORD` ni `METRICS_PASSWORD` (mínimo 16 caracteres).
 - **Swagger UI público en producción** ([ADR-017](docs/adr/ADR-017.md)): la página carga sin token, pero cada llamada al catálogo lo exige.
@@ -444,10 +461,18 @@ Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en códig
 | [015](docs/adr/ADR-015.md) | Dashboard público con Grafana Cloud y scrape autenticado |
 | [016](docs/adr/ADR-016.md) | GraphQL y MCP como adaptadores del mismo `CatalogService` |
 | [017](docs/adr/ADR-017.md) | Swagger UI y GraphiQL públicos en producción |
+| [018](docs/adr/ADR-018.md) | Estrategia de logging para producción |
 
 ## ¿Por qué no microservicios?
 
-El dominio es uno solo: cuatro recursos de lectura que vienen del mismo proveedor, y el único estado propio son los usuarios. Separarlo en servicios agregaría latencia de red, despliegues coordinados, trazas distribuidas y fallas parciales, sin un beneficio concreto: no hay equipos distintos ni cargas que escalen distinto. Los límites entre módulos están marcados por paquetes con dependencias en una sola dirección, verificadas por ArchUnit, así que extraer uno más adelante no exige reescribir.
+El dominio es uno solo: cuatro recursos de lectura que vienen del mismo proveedor, y el único estado propio son los usuarios. Separarlo en servicios agregaría latencia de red, despliegues coordinados, trazas distribuidas y fallas parciales, sin un beneficio concreto: no hay equipos distintos ni cargas que escalen distinto. Los límites entre módulos (`auth`, `catalog`, `swapi`) están marcados por paquetes con dependencias en una sola dirección, verificadas por ArchUnit, y el cliente de SWAPI está detrás de una interfaz: extraer un módulo más adelante no exige reescribir. El [RFC](docs/RFC.md#en-un-ecosistema-de-microservicios) lista lo que se sumaría en un ecosistema de varios servicios.
+
+## Cómo lo escalaría
+
+1. **Réplicas stateless detrás de un load balancer.** La app no guarda sesión: cualquier réplica valida cualquier token. Lo que hoy vive en memoria pasa a Redis para que lo compartan todas: la caché de SWAPI (Caffeine → Redis con el mismo TTL) y el rate limiting del login (Bucket4j tiene backend para Redis; `LoginRateLimiter` es la interfaz que se reemplaza).
+2. **Identity Provider externo** (Keycloak, Auth0, Cognito). El Resource Server ya valida JWT estándar: alcanza con configurar `issuer-uri` en lugar de la clave HMAC y emitir los tokens afuera. El login y los usuarios en H2 desaparecen de la app.
+3. **Sincronizar SWAPI a una base propia** (PostgreSQL o MongoDB) con un job periódico. Los datos son casi estáticos, así que la API deja de depender de la disponibilidad y el rate limit de SWAPI, y puede paginar y filtrar con índices en lugar de en memoria.
+4. **Microservicios solo si aparece la necesidad:** equipos separados o cargas muy distintas entre auth y catálogo. En ese caso irían detrás de un API Gateway, con OpenTelemetry para las trazas y lo listado en la sección "En un ecosistema de microservicios" del RFC.
 
 ## Licencia
 

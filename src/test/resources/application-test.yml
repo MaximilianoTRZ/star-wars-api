@@ -10,6 +10,9 @@ app:
       secret: test-secret-0123456789-0123456789-0123456789
     demo-user:
       password: test-password
+    # Integration tests share the context and log in on every test; LoginRateLimitIT uses the real limit.
+    login-rate-limit:
+      capacity: 1000
 
 management:
   server:

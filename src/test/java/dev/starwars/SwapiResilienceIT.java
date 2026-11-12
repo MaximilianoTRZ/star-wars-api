@@ -21,9 +21,12 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpHeaders;
@@ -40,6 +43,7 @@ import org.springframework.test.context.DynamicPropertySource;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class SwapiResilienceIT {
 
     @RegisterExtension
@@ -172,14 +176,42 @@ class SwapiResilienceIT {
     }
 
     @Test
+    @DisplayName("retry: a 503 followed by 200 logs the retry and the success under one requestId")
+    void logsRecoveredRetry(CapturedOutput output) {
+        String scenario = "fails once";
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario(scenario)
+                .whenScenarioStateIs(Scenario.STARTED)
+                .willReturn(aResponse().withStatus(503))
+                .willSetStateTo("up"));
+        swapi.stubFor(get(urlEqualTo("/api/people/1"))
+                .inScenario(scenario)
+                .whenScenarioStateIs("up")
+                .willReturn(okJson(Fixtures.swapi("people-1.json"))));
+
+        ResponseEntity<String> response = call("/api/v1/people/1");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String requestId = response.getHeaders().getFirst("X-Request-Id");
+        assertThat(output)
+                .containsPattern(
+                        "\\[" + requestId + "] .*SWAPI attempt 1/3 failed \\(SERVER_ERROR\\), retrying in \\d+ms")
+                .containsPattern("\\[" + requestId + "] .*SWAPI call succeeded on attempt 2")
+                .containsPattern("\\[" + requestId + "] .*GET /api/v1/people/\\{id} 200 \\d+ms");
+    }
+
+    @Test
     @DisplayName("retry: gives up after three attempts with 503")
-    void givesUpAfterThreeAttempts() {
+    void givesUpAfterThreeAttempts(CapturedOutput output) {
         swapi.stubFor(get(urlEqualTo("/api/people/1")).willReturn(aResponse().withStatus(500)));
 
         ResponseEntity<String> response = call("/api/v1/people/1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         swapi.verify(3, getRequestedFor(urlEqualTo("/api/people/1")));
+        assertThat(output)
+                .containsPattern("WARN.*SWAPI call failed after 3 attempts \\(SERVER_ERROR\\)")
+                .containsPattern("WARN.*GET /api/v1/people/\\{id} 503");
     }
 
     @Test
@@ -228,7 +260,7 @@ class SwapiResilienceIT {
 
     @Test
     @DisplayName("retry: a read timeout answers 503 without retrying")
-    void timeoutNotRetried() {
+    void timeoutNotRetried(CapturedOutput output) {
         swapi.stubFor(get(urlEqualTo("/api/people/1"))
                 .willReturn(okJson(Fixtures.swapi("people-1.json")).withFixedDelay(4_000)));
 
@@ -239,11 +271,12 @@ class SwapiResilienceIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(elapsed).isLessThan(Duration.ofSeconds(4));
         swapi.verify(1, getRequestedFor(urlEqualTo("/api/people/1")));
+        assertThat(output).containsPattern("WARN.*SWAPI call failed and is not retried \\(TIMEOUT\\)");
     }
 
     @Test
     @DisplayName("circuit breaker: repeated failures open the circuit and SWAPI is no longer called")
-    void opensAfterRepeatedFailures() {
+    void opensAfterRepeatedFailures(CapturedOutput output) {
         swapi.stubFor(
                 get(urlPathMatching("/api/people/.*")).willReturn(aResponse().withStatus(500)));
 
@@ -259,6 +292,7 @@ class SwapiResilienceIT {
         assertThat(JsonPath.<String>read(response.getBody(), "$.type")).isEqualTo("/problems/upstream-unavailable");
         assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("30");
         assertThat(swapi.getAllServeEvents()).hasSize(requestsBefore);
+        assertThat(output).containsPattern("WARN.*SWAPI circuit breaker changed from CLOSED to OPEN");
     }
 
     @Test
