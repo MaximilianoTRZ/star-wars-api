@@ -657,11 +657,11 @@ El reviewer ve el dashboard con datos reales de la app desplegada, desde una URL
 
 ### Salida de la fase
 
-- [ ] `docker compose up` levanta app, Prometheus y Grafana con el dashboard cargado sin pasos manuales
-- [ ] Dashboard público en Grafana Cloud con datos de Render
-- [ ] Endpoint de métricas protegido y fuera de la API
-- [ ] Correlation ID presente en logs, headers y errores
-- [ ] Tag `v1.2.0`
+- [x] `docker compose up` levanta app, Prometheus y Grafana con el dashboard cargado sin pasos manuales
+- [x] Dashboard público en Grafana Cloud con datos de Render
+- [x] Endpoint de métricas protegido y fuera de la API
+- [x] Correlation ID presente en logs, headers y errores
+- [x] Tag `v1.2.0`
 
 ## 8. Fase 4 — Extras (~1,5 h, tag `v1.3.0`)
 
