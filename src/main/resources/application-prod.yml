@@ -36,5 +36,7 @@ logging:
         max-length: 8192
 
 # Behind Render's proxy: the client IP (used by the login rate limit) comes from X-Forwarded-For.
+# Render appends the real client IP to whatever the client sent, so the leftmost value can be spoofed.
+# Tomcat's RemoteIpValve ("native") reads the list from the right and skips internal proxies.
 server:
-  forward-headers-strategy: framework
+  forward-headers-strategy: native

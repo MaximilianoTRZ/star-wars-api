@@ -671,7 +671,7 @@ Objetivo: seguridad más allá del mínimo y criterio arquitectónico explícito
 
 - Bucket4j en memoria, clave por IP de origen: 5 intentos por minuto en `POST /api/v1/auth/login`.
 - Excedido → 429 `ProblemDetail` (`/problems/too-many-requests`) con `Retry-After`.
-- Detrás del proxy de Render la IP sale de `X-Forwarded-For`, con `server.forward-headers-strategy=framework`.
+- Detrás del proxy de Render la IP sale de `X-Forwarded-For`, con `server.forward-headers-strategy=native`. El proxy de Render agrega la IP real al final del header que manda el cliente, así que el primer valor se puede falsear: el `RemoteIpValve` de Tomcat lee la lista desde la derecha y saltea los proxies internos.
 - La métrica `auth.login.attempts` suma el valor `blocked` en `result`, y la alerta de logins fallidos lo incluye.
 - Limitación documentada: en memoria no se comparte entre réplicas (con Redis sí, ver "Cómo lo escalaría"). Los buckets expiran para no crecer sin límite.
 - **Tests:** unitarios del limitador con un reloj controlado; IT con 6 logins seguidos desde la misma IP → el sexto devuelve 429 con `Retry-After`, y otra IP no se ve afectada.

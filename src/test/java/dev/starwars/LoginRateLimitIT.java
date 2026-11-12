@@ -20,11 +20,11 @@ import org.springframework.web.client.RestClient;
 
 /**
  * Login rate limit on the running app, with the production limit (5 per minute) and client IPs taken from
- * {@code X-Forwarded-For}, as behind Render's proxy.
+ * {@code X-Forwarded-For} as in {@code prod}: Render's proxy appends the real IP to the header the client sent.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"app.security.login-rate-limit.capacity=5", "server.forward-headers-strategy=framework"})
+        properties = {"app.security.login-rate-limit.capacity=5", "server.forward-headers-strategy=native"})
 @ActiveProfiles("test")
 @ExtendWith(OutputCaptureExtension.class)
 class LoginRateLimitIT {
@@ -79,5 +79,18 @@ class LoginRateLimitIT {
         assertThat(output)
                 .containsPattern("WARN.*Login blocked by rate limit for 203\\.0\\.113\\.10, retry in \\d+s")
                 .containsPattern("INFO.*POST /api/v1/auth/login 429");
+    }
+
+    @Test
+    @DisplayName("a client cannot dodge the limit by sending its own X-Forwarded-For")
+    void spoofedForwardedForIsIgnored() {
+        for (int i = 0; i < 5; i++) {
+            assertThat(loginFrom("198.51.100." + i + ", 203.0.113.30").getStatusCode())
+                    .isEqualTo(HttpStatus.OK);
+        }
+
+        ResponseEntity<String> sixth = loginFrom("198.51.100.99, 203.0.113.30");
+
+        assertThat(sixth.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 }
