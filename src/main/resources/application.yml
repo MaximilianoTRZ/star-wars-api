@@ -4,6 +4,10 @@ spring:
   threads:
     virtual:
       enabled: true
+  web:
+    # Validation and error messages always in English
+    locale: en
+    locale-resolver: fixed
 
 app:
   swapi:
