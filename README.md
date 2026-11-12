@@ -92,7 +92,7 @@ Para una revisión acotada alcanza con esta parte: cubre los 7 requisitos de la 
 | 3 | [`v1.2.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.2.0) | Métricas técnicas y de negocio, correlation ID, Prometheus y Grafana como código, dashboard público | Saber qué pasa en producción sin entrar al servidor | [Observabilidad](#observabilidad) |
 | 4 | [`v1.3.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.3.0) | Rate limiting del login, logging de producción, notas de escalabilidad | Frenar fuerza bruta y diagnosticar desde los logs de Render | [Seguridad](#seguridad), [Logs](#logs-y-correlación), [Escalabilidad](#cómo-lo-escalaría) |
 | 5 | [`v1.4.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.4.0) | GraphQL y GraphiQL sobre el mismo `CatalogService`, con la fila de alertas en el dashboard | Consultas con la forma que pide el cliente, sin duplicar lógica | [GraphQL](#graphql) |
-| 6 | `v1.5.0` (en curso) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [MCP](#mcp) |
+| 6 | [`v1.5.0`](https://github.com/MaximilianoTRZ/star-wars-api/releases/tag/v1.5.0) | Servidor MCP para clientes de IA (Claude, Cursor) | Consultar el catálogo desde un asistente con el mismo JWT | [MCP](#mcp) |
 
 El detalle de cada fase (work units, tests, decisiones SOLID y criterios de salida) está en el [RFC](docs/RFC.md); las decisiones de diseño, en los [ADRs](#decisiones-de-diseño).
 
@@ -124,7 +124,7 @@ El token viaja en el fragmento de la URL (`#token=`), que el navegador no envía
 
 **Todo junto con Postman:** importar la [colección](docs/postman/star-wars-api.postman_collection.json) y el entorno [`render`](docs/postman/render.postman_environment.json), y correrla con el *Collection Runner*. El request **Login** guarda el `accessToken` en la variable `token` de la colección, y todos los demás requests (REST, GraphQL y MCP) lo usan como `Bearer {{token}}`: no hay que copiar ni pegar el token. Cada request trae sus aserciones, así que la corrida muestra qué pasó y qué falló. Ver [Uso](#uso) para correrla con newman.
 
-Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 170 s en arrancar (medido en el deploy de la Fase 5), así que si la instancia está dormida el primer request puede tardar unos 3 minutos. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
+Corre en el plan gratuito de Render (0,1 CPU, 512 MB), que duerme la instancia después de un rato sin tráfico. Con tan poca CPU la app tarda unos 195 s en arrancar (medido en el deploy de la Fase 6), así que si la instancia está dormida el primer request puede tardar unos 3 minutos y medio. El scrape de Grafana Cloud cada 1 minuto la mantiene despierta. Además, SWAPI tarda entre 2 y 9 s por request desde Render; las respuestas quedan en caché una hora (ver [Resiliencia y caché](#resiliencia-y-caché)).
 
 ## Quick start
 
