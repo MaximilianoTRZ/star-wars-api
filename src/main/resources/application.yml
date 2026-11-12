@@ -5,6 +5,13 @@ spring:
     virtual:
       enabled: true
 
+app:
+  swapi:
+    base-url: https://www.swapi.tech/api
+    connect-timeout: 2s
+    # SWAPI takes 2 to 9 s per request from Render
+    read-timeout: 10s
+
 management:
   endpoints:
     web:

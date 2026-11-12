@@ -1,0 +1,29 @@
+{
+  "message": "ok",
+  "total_records": 39,
+  "total_pages": 13,
+  "previous": null,
+  "next": "https://www.swapi.tech/api/vehicles?page=2&limit=3",
+  "results": [
+    {
+      "uid": "4",
+      "name": "Sand Crawler",
+      "url": "https://www.swapi.tech/api/vehicles/4"
+    },
+    {
+      "uid": "7",
+      "name": "X-34 landspeeder",
+      "url": "https://www.swapi.tech/api/vehicles/7"
+    },
+    {
+      "uid": "6",
+      "name": "T-16 skyhopper",
+      "url": "https://www.swapi.tech/api/vehicles/6"
+    }
+  ],
+  "apiVersion": "1.0",
+  "timestamp": "2026-11-11T20:16:19.043Z",
+  "support": {
+    "contact": "admin@swapi.tech"
+  }
+}
