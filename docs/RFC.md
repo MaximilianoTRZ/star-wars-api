@@ -155,6 +155,7 @@ En la Fase 5 se suma `catalog/graphql/` y en la Fase 6 `catalog/mcp/`, como adap
 - Secretos solo por variables de entorno: `JWT_SECRET`, `DEMO_USER_PASSWORD` y, desde la Fase 3, `METRICS_PASSWORD`.
 - En el perfil `default` tienen un valor de desarrollo explícito, para que `./mvnw spring-boot:run` levante sin `.env`. En `prod` no hay default: si falta alguno, la app no arranca. Un placeholder sin resolver (`${DEMO_USER_PASSWORD}`) también cuenta como faltante; las propiedades lo validan explícitamente.
 - `JWT_SECRET` de al menos 32 bytes y `METRICS_PASSWORD` de al menos 16 caracteres, validados al arrancar.
+- `JWT_PREVIOUS_SECRET` es opcional: solo valida tokens mientras se rota `JWT_SECRET`. Si está, también exige 32 bytes y tiene que ser distinto del actual (ADR-020).
 - `.env.example` versionado con valores ficticios; `.env` en `.gitignore`.
 
 ### Testing
@@ -445,7 +446,7 @@ Un único formato de error para toda la API, incluidos los 401 y 403 de la caden
 - **Contraseñas:** `BCryptPasswordEncoder`. La autenticación pasa por `AuthenticationManager` + `DaoAuthenticationProvider`.
 - **Login:** `POST /api/v1/auth/login` con body `{username, password}` → 200 `{accessToken, tokenType, expiresIn}`; 400 si falta un campo; 401 con el mismo mensaje para usuario inexistente y contraseña incorrecta.
 - **Emisión del token:** `TokenService` con `NimbusJwtEncoder` y clave HMAC SHA-256. Claims: `iss` (`star-wars-api`), `sub`, `iat`, `exp` (1 h) y `scope: catalog:read`. Recibe un `Clock` para poder testear la expiración.
-- **Validación:** `oauth2ResourceServer(jwt)` con `NimbusJwtDecoder.withSecretKey(...)`, validando firma, expiración e issuer (ADR-004).
+- **Validación:** `oauth2ResourceServer(jwt)` con `NimbusJwtDecoder.withSecretKey(...)`, validando firma, expiración e issuer (ADR-004). Desde ADR-020 el decoder usa un JWK set con la clave actual y, durante una rotación, la anterior; elige la clave por el `kid` del header.
 - **Autorización:** los endpoints del catálogo exigen `SCOPE_catalog:read`, no solo estar autenticado.
 - **Rutas públicas:** `POST /api/v1/auth/login`, `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` y los health probes. Todo lo demás se rechaza por defecto.
 - **Sesión y CSRF:** `STATELESS`; CSRF deshabilitado porque no hay cookies de sesión (justificado en el README).
@@ -901,6 +902,7 @@ Cada decisión tiene su archivo en [`docs/adr/`](adr/).
 | [017](adr/ADR-017.md) | Swagger UI y GraphiQL públicos en prod; los datos siguen detrás del JWT | Interfaces solo en local | El reviewer prueba REST y GraphQL desde el navegador, sin instalar nada |
 | [018](adr/ADR-018.md) | Logging de producción: un evento por decisión, línea de acceso, key-values en ECS | Loki; access log de Tomcat; `WARN` por intento; `/actuator/loggers` en prod | Diagnosticar desde la consola de Render filtrando por `requestId`, sin infraestructura nueva |
 | [019](adr/ADR-019.md) | Servidor MCP stateless con el JWT en un header | Streamable HTTP con sesión; OAuth 2.1 del spec MCP; servicio MCP aparte | Sin estado por cliente, mismo JWT que REST y GraphQL, se prueba con curl |
+| [020](adr/ADR-020.md) | Rotación de la clave JWT con `kid` y una clave anterior que solo valida | Rotar sin `kid`; lista de N claves; recarga en caliente; pasar a RS256 | Rotar sin cortar sesiones; con tokens de 1 h alcanza una clave anterior |
 
 ### Riesgos
 

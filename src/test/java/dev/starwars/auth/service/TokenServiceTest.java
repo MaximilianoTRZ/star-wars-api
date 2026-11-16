@@ -19,10 +19,11 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 class TokenServiceTest {
 
     private static final String SECRET = "test-secret-0123456789-0123456789-0123456789";
-    private static final JwtProperties PROPERTIES = new JwtProperties(SECRET, "star-wars-api", Duration.ofHours(1));
+    private static final JwtProperties PROPERTIES =
+            new JwtProperties(SECRET, "star-wars-api", Duration.ofHours(1), null);
 
     @Test
-    @DisplayName("issues an HS256 JWT with issuer, subject, scope and 1 h expiration")
+    @DisplayName("issues an HS256 JWT with kid, issuer, subject, scope and 1 h expiration")
     void issuesTokenWithExpectedClaims() {
         Instant now = Instant.now();
         var service = new TokenService(JwtConfig.encoder(SECRET), PROPERTIES, Clock.fixed(now, ZoneOffset.UTC));
@@ -34,7 +35,7 @@ class TokenServiceTest {
                 .build()
                 .decode(token.value());
         assertThat(token.expiresInSeconds()).isEqualTo(3600);
-        assertThat(jwt.getHeaders()).containsEntry("alg", "HS256");
+        assertThat(jwt.getHeaders()).containsEntry("alg", "HS256").containsEntry("kid", JwtConfig.keyId(SECRET));
         assertThat(jwt.getClaimAsString("iss")).isEqualTo("star-wars-api");
         assertThat(jwt.getSubject()).isEqualTo("demo");
         assertThat(jwt.getClaimAsString("scope")).isEqualTo("catalog:read");

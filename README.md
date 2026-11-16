@@ -174,6 +174,7 @@ Después abrir http://localhost:8080/swagger-ui.html, ejecutar `POST /api/v1/aut
 | Variable | Descripción | Default local | En `prod` |
 |---|---|---|---|
 | `JWT_SECRET` | Clave HMAC-SHA256 para firmar los tokens, mínimo 32 bytes | Valor de desarrollo | Obligatoria |
+| `JWT_PREVIOUS_SECRET` | Clave anterior, solo valida tokens mientras se rota `JWT_SECRET` | — | Opcional |
 | `DEMO_USER_PASSWORD` | Contraseña del usuario `demo` | `demo123` | Obligatoria |
 | `SPRING_PROFILES_ACTIVE` | Perfil activo | — | `prod` |
 | `METRICS_USERNAME` | Usuario del scrape de `/actuator/prometheus` | — | `grafana` por defecto |
@@ -182,6 +183,7 @@ Después abrir http://localhost:8080/swagger-ui.html, ejecutar `POST /api/v1/aut
 
 - En el perfil `prod`, si falta una variable o el secreto es corto, la app no arranca (fail fast).
 - Para generar un secreto: `openssl rand -base64 48`.
+- Para rotar `JWT_SECRET` sin invalidar los tokens vigentes: pasar el valor actual a `JWT_PREVIOUS_SECRET`, poner el nuevo en `JWT_SECRET` y deployar. Pasada 1 h, borrar `JWT_PREVIOUS_SECRET` y redeployar ([ADR-020](docs/adr/ADR-020.md)).
 - [`.env.example`](.env.example) muestra el formato. `docker compose` lee `.env` si existe.
 
 ## Uso
@@ -643,7 +645,7 @@ Para seguir una request en Render: copiar el `requestId` del error (o del header
 ## Seguridad
 
 - **Login:** `AuthenticationManager` + `DaoAuthenticationProvider`, con contraseñas en BCrypt guardadas en H2 ([ADR-005](docs/adr/ADR-005.md)). Usuario inexistente y contraseña incorrecta devuelven el mismo error.
-- **Token:** JWT HS256 de 1 h con `iss`, `sub`, `iat`, `exp` y `scope: catalog:read`. Lo valida el OAuth2 Resource Server de Spring: firma, expiración e issuer ([ADR-004](docs/adr/ADR-004.md)).
+- **Token:** JWT HS256 de 1 h con `iss`, `sub`, `iat`, `exp` y `scope: catalog:read`. Lo valida el OAuth2 Resource Server de Spring: firma, expiración e issuer ([ADR-004](docs/adr/ADR-004.md)). El header lleva un `kid` que permite rotar la clave sin invalidar los tokens vigentes ([ADR-020](docs/adr/ADR-020.md)).
 - **Autorización:** los endpoints del catálogo, `/graphql` y `/mcp` exigen el scope `catalog:read`; estar autenticado no alcanza.
 - **Deny by default:** solo son públicos el login, Swagger UI, el documento OpenAPI, GraphiQL y los probes `/livez` y `/readyz`. Cualquier otra ruta sin token responde 401.
 - **Métricas:** en local Actuator vive en el puerto de management (8081), que no se publica. En Render comparte el puerto público y `/actuator/prometheus` exige HTTP Basic con un usuario propio, que no sirve para llamar a la API ([ADR-015](docs/adr/ADR-015.md)).
@@ -742,6 +744,7 @@ Quality gate "Sonar way" en verde: 0 issues nuevos, 97,8% de cobertura en códig
 | [017](docs/adr/ADR-017.md) | Swagger UI y GraphiQL públicos en producción |
 | [018](docs/adr/ADR-018.md) | Estrategia de logging para producción |
 | [019](docs/adr/ADR-019.md) | Servidor MCP stateless con el JWT en un header |
+| [020](docs/adr/ADR-020.md) | Rotación de la clave JWT sin invalidar tokens (y por qué HS256 y no RS256) |
 
 ## ¿Por qué no microservicios?
 
