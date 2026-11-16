@@ -58,6 +58,8 @@ app:
     jwt:
       # Local development default only. The prod profile requires JWT_SECRET.
       secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789}
+      # Only validates tokens while rotating the secret; empty when not rotating (ADR-020).
+      previous-secret: ${JWT_PREVIOUS_SECRET:}
       issuer: star-wars-api
       ttl: 1h
     login-rate-limit:

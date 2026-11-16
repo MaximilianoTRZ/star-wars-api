@@ -1,5 +1,6 @@
 package dev.starwars.auth.service;
 
+import dev.starwars.auth.security.JwtConfig;
 import dev.starwars.auth.security.JwtProperties;
 import dev.starwars.auth.security.SecurityConfig;
 import java.time.Clock;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>HS256 token with claims {@code iss}, {@code sub} (username), {@code iat}, {@code exp}
  * ({@code iat} + {@code app.security.jwt.ttl}) and {@code scope = catalog:read}. The injected
- * {@link Clock} makes expiration testable.
+ * {@link Clock} makes expiration testable. The header carries the {@code kid} of the signing key (ADR-020).
  */
 @Service
 public class TokenService {
@@ -42,7 +43,9 @@ public class TokenService {
                 .expiresAt(expiresAt)
                 .claim("scope", SecurityConfig.CATALOG_READ_SCOPE)
                 .build();
-        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
+                .keyId(JwtConfig.keyId(properties.secret()))
+                .build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
         return new IssuedToken(token, properties.ttl().toSeconds());
     }
