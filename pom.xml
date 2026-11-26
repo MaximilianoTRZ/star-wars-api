@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.2</version>
+        <version>4.2.0</version>
         <relativePath/>
     </parent>
 
@@ -22,16 +22,16 @@
         <!-- Base JVM args for test forks; the JaCoCo agent is appended to it -->
         <argLine/>
         <archunit.version>1.5.1</archunit.version>
-        <springdoc.version>3.1.1</springdoc.version>
-        <spring-ai.version>2.0.2</spring-ai.version>
+        <springdoc.version>3.2.1</springdoc.version>
+        <spring-ai.version>2.1.0</spring-ai.version>
         <!-- resilience4j-spring-boot4 is not in the 2.4.0 BOM: explicit version -->
         <resilience4j.version>2.4.0</resilience4j.version>
         <wiremock.version>3.13.2</wiremock.version>
-        <bucket4j.version>8.22.0</bucket4j.version>
-        <spotless.version>3.11.0</spotless.version>
+        <bucket4j.version>8.23.0</bucket4j.version>
+        <spotless.version>3.12.0</spotless.version>
         <palantir-java-format.version>2.103.0</palantir-java-format.version>
         <jacoco.minimum-line-coverage>0.80</jacoco.minimum-line-coverage>
-        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+        <sonar-maven-plugin.version>5.9.0.7382</sonar-maven-plugin.version>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.organization>maximilianotrz</sonar.organization>
         <sonar.projectKey>MaximilianoTRZ_star-wars-api</sonar.projectKey>
